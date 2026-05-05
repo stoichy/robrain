@@ -30,7 +30,7 @@ Step 3 above — `init-project` — writes the `CLAUDE.md` instructions that tel
 
 That's it. After that — nothing.
 
-> **Running from a local clone?** `npx robrain` is the short form used throughout this README. If the package isn't published yet, run `pnpm install && pnpm build` once, then substitute `node packages/cli/dist/index.js` for `npx robrain` (same arguments).
+`npx robrain` is the canonical CLI path used throughout this README.
 
 ## Cursor-specific setup (most reliable path)
 

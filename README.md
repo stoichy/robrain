@@ -6,36 +6,27 @@ RoBrain remembers architectural decisions, rationale, and rejected alternatives 
 
 Works across Claude Code, Cursor, and Copilot sessions.
 
+## Setup — four steps, then fully automatic
+
+Do these four things once. After that, capture runs in the background whenever Claude Code is open.
+
 ```bash
-# Install and start
-git clone https://github.com/roryplans/robrain
-cd robrain && cp .env.example .env
-# Add API keys once (shared by Docker and `robrain install --repo-root`)
-pnpm install
+# 1. Start the Docker stack (Postgres + Perception)
 pnpm docker:up
 
-# CLI from this repo (build first, then use node …/dist/index.js)
-pnpm build
+# 2. Install the CLI and wire Sensing into Claude Code
+npx robrain install --self-hosted
 
-#  Install the local package globally — then use robrain normally:
-pnpm install -g /absolute/path/to/robrain/robrain/packages/cli
+# 3. Go to your project
+cd /path/to/your/project
 
-# Register Sensing MCP (links built packages/sensing-mcp → ~/.robrain/mcp/sensing)
-node packages/cli/dist/index.js install --self-hosted --repo-root "$(pwd)"
-
-# Initialize your project
-node packages/cli/dist/index.js init-project
-
-# After sessions: review what was captured
-node packages/cli/dist/index.js review
-
-# Get context to paste into Claude Code
-node packages/cli/dist/index.js inject --query "auth decisions" --copy
+# 4. Initialize the project (writes CLAUDE.md so Claude calls Sensing)
+npx robrain init-project
 ```
 
-When the CLI is published to npm under a usable package name, you can replace `node packages/cli/dist/index.js` with `npx robrain` or `npx @robrain/cli` (depending on publish settings).
+That's it. Step 4 is per-repo — every other step is one-time, ever.
 
-Throughout this README, `npx robrain …` appears as the short form for the CLI; **from a local clone**, run `pnpm build` once and substitute `node packages/cli/dist/index.js` for `npx robrain` (same arguments).
+> **Running from a local clone?** `npx robrain` is the short form used throughout this README. If the package isn't published yet, run `pnpm install && pnpm build` once, then substitute `node packages/cli/dist/index.js` for `npx robrain` (same arguments).
 
 ---
 
@@ -426,6 +417,31 @@ The honest difference: OSS gives you the capture and storage layer — decisions
 The extraction quality difference is real but secondary. Both versions use Claude Haiku. The cloud version has a more calibrated prompt that reduces false positives — we'll publish numbers once we have real-session benchmark data. But the bigger gap is automatic injection vs manual paste. That's a workflow change, not just an accuracy improvement.
 
 **Get cloud access:** [roryplans.ai](https://roryplans.ai)
+
+---
+
+## Troubleshooting
+
+After the four-step setup, Sensing runs automatically whenever Claude Code is open. The MCP server is registered in `~/.claude/mcp.json`, so Claude Code launches it on startup, and the `CLAUDE.md` written by `init-project` tells Claude to call `sensing_start_session` at the beginning of each session and `sensing_record_turn` after every exchange.
+
+**The one thing that can break it:**
+
+Claude Code doesn't always follow `CLAUDE.md` instructions reliably. If it stops calling `sensing_record_turn`, Sensing goes silent. To check:
+
+```bash
+npx robrain status
+```
+
+If `Decisions: 0` after a session where you made architectural choices, Claude probably didn't call the tools. Two fixes:
+- Make the `CLAUDE.md` instructions more explicit, or
+- Remind Claude at the start of the session: *"please follow the RoBrain instructions in CLAUDE.md."*
+
+**The two habits worth keeping:**
+
+- `npx robrain review` after sessions where important decisions were made
+- `npx robrain inject --copy` before starting a new task that builds on prior work
+
+Everything else — capture, extraction, storage, embedding — happens without you doing anything.
 
 ---
 

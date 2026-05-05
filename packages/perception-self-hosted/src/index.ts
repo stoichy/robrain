@@ -161,16 +161,11 @@ app.get('/decisions', async (c) => {
   const projectId  = c.req.query('project_id')
   const sessionId  = c.req.query('session_id')
   const all        = c.req.query('all') === 'true'
+  const history    = c.req.query('history') === 'true'
   const query_text = c.req.query('query')   // for robrain inject semantic search
+  const limit      = Math.min(parseInt(c.req.query('limit') ?? '20'), 100)
 
   if (!projectId) return c.json({ error: 'project_id required' }, 400)
-
-  const limitRaw    = c.req.query('limit') ?? '20'
-  const parsedLimit = Number.parseInt(limitRaw, 10)
-  if (!Number.isFinite(parsedLimit) || parsedLimit < 1) {
-    return c.json({ error: 'invalid limit' }, 400)
-  }
-  const limit = Math.min(parsedLimit, 100)
 
   try {
     let rows: unknown[]
@@ -182,6 +177,7 @@ app.get('/decisions', async (c) => {
         SELECT d.id, d.decision, d.rationale, d.rejected,
                d.files_affected, d.confidence, d.scope,
                d.created_at, d.session_id, d.conflict_flag,
+               d.supersedes_id, d.invalidated_at,
                1 - (d.embedding <=> $1::vector) AS similarity
         FROM ${S}.decisions d
         JOIN ${S}.sessions s ON s.id = d.session_id
@@ -197,25 +193,41 @@ app.get('/decisions', async (c) => {
       const result = await pool.query(`
         SELECT d.id, d.decision, d.rationale, d.rejected,
                d.files_affected, d.confidence, d.scope,
-               d.created_at, d.session_id, d.conflict_flag
+               d.created_at, d.session_id, d.conflict_flag,
+               d.supersedes_id, d.invalidated_at
         FROM ${S}.decisions d
         WHERE d.session_id = $1 AND d.invalidated_at IS NULL
         ORDER BY d.created_at DESC LIMIT $2
       `, [sessionId, limit])
       rows = result.rows
-    } else if (all) {
+    } else if (all && !history) {
+      // --all without --history: active decisions across the whole project
       const result = await pool.query(`
         SELECT d.id, d.decision, d.rationale, d.rejected,
                d.files_affected, d.confidence, d.scope,
-               d.created_at, d.session_id, d.conflict_flag
+               d.created_at, d.session_id, d.conflict_flag,
+               d.supersedes_id, d.invalidated_at
         FROM ${S}.decisions d
         JOIN ${S}.sessions s ON s.id = d.session_id
         WHERE s.project_id = $1 AND d.invalidated_at IS NULL
         ORDER BY d.created_at DESC LIMIT $2
       `, [projectId, limit])
       rows = result.rows
+    } else if (history) {
+      // --history (with or without --all): full lifecycle for the project
+      const result = await pool.query(`
+        SELECT d.id, d.decision, d.rationale, d.rejected,
+               d.files_affected, d.confidence, d.scope,
+               d.created_at, d.session_id, d.conflict_flag,
+               d.supersedes_id, d.invalidated_at
+        FROM ${S}.decisions d
+        JOIN ${S}.sessions s ON s.id = d.session_id
+        WHERE s.project_id = $1
+        ORDER BY d.created_at ASC LIMIT $2
+      `, [projectId, limit])
+      rows = result.rows
     } else {
-      // Default: last 3 sessions
+      // Default: last 3 sessions, active only
       const result = await pool.query(`
         WITH recent AS (
           SELECT id FROM ${S}.sessions
@@ -224,7 +236,8 @@ app.get('/decisions', async (c) => {
         )
         SELECT d.id, d.decision, d.rationale, d.rejected,
                d.files_affected, d.confidence, d.scope,
-               d.created_at, d.session_id, d.conflict_flag
+               d.created_at, d.session_id, d.conflict_flag,
+               d.supersedes_id, d.invalidated_at
         FROM ${S}.decisions d
         WHERE d.session_id IN (SELECT id FROM recent)
           AND d.invalidated_at IS NULL

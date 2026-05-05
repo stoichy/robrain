@@ -18,6 +18,7 @@ import { initProjectCommand }  from './commands/init-project.js'
 import { statusCommand, ruleCommand, logoutCommand } from './commands/status.js'
 import { reviewCommand }       from './commands/review.js'
 import { injectCommand }       from './commands/inject.js'
+import { explainCommand }      from './commands/explain.js'
 
 const VERSION = '0.1.0'
 
@@ -32,14 +33,27 @@ program
   .command('review')
   .description('Review, edit, or delete decisions captured by RoBrain')
   .option('-s, --session <id>', 'Review a specific session ID (default: last session)')
-  .option('-a, --all',          'Show all stored decisions, not just the last session')
+  .option('-a, --all',          'Show all active decisions, not just the last session')
+  .option('--history',          'Show full lifecycle including superseded decisions')
   .option('-l, --limit <n>',    'Max decisions to show (default: 20)', parseInt)
-  .action(async (opts: { session?: string; all?: boolean; limit?: number }) => {
+  .action(async (opts: { session?: string; all?: boolean; history?: boolean; limit?: number }) => {
     await reviewCommand({
       session: opts.session ?? 'last',
       all:     opts.all,
+      history: opts.history,
       limit:   opts.limit,
     })
+  })
+
+// ── explain ───────────────────────────────────────────────────
+
+program
+  .command('explain <file>')
+  .description('Answer "why does this code exist?" for any file or directory')
+  .option('-w, --why',  'Show full rationale and rejected alternatives')
+  .option('-c, --copy', 'Copy output to clipboard')
+  .action(async (file: string, opts: { why?: boolean; copy?: boolean }) => {
+    await explainCommand(file, opts)
   })
 
 // ── inject ────────────────────────────────────────────────────
@@ -125,11 +139,12 @@ program.addHelpText('beforeAll', `
 
 program.addHelpText('afterAll', `
   Self-hosted quick start:
-    pnpm docker:up                              Start Postgres + Perception
-    npx robrain install --self-hosted           Wire Sensing into Claude Code
-    npx robrain init-project                    Warm-start memory from codebase
-    npx robrain review                          Review captured decisions
-    npx robrain inject --query "..." --copy     Get context to paste into Claude Code
+    pnpm docker:up                                  Start Postgres + Perception
+    npx robrain install --self-hosted               Wire Sensing into Claude Code
+    npx robrain init-project                        Warm-start memory from codebase
+    npx robrain review                              Review captured decisions
+    npx robrain inject --query "..." --copy         Get context to paste into Claude Code
+    npx robrain explain src/store/cart.ts           Why does this file look this way?
 
   Cloud quick start (automatic injection, no paste):
     npx robrain install --token YOUR_TOKEN      Authenticate with Rory Plans

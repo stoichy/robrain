@@ -97,16 +97,14 @@ export async function seedProjectMemory(
   perceptionKey: string,
   info: ProjectInfo,
 ): Promise<{ ok: boolean; decisionsWritten: number }> {
-  const withAuth = (h: Record<string, string>): Record<string, string> => {
-    if (perceptionKey) h['Authorization'] = `Bearer ${perceptionKey}`
-    return h
-  }
-
   try {
     // 1. Register the project
     await fetch(`${perceptionUrl}/projects`, {
       method: 'POST',
-      headers: withAuth({ 'Content-Type': 'application/json' }),
+      headers: {
+        'Content-Type':  'application/json',
+        ...(perceptionKey ? { 'Authorization': `Bearer ${perceptionKey}` } : {}),
+      },
       body: JSON.stringify({ id: info.id, name: info.name }),
     })
 
@@ -166,10 +164,11 @@ No explanation outside the JSON.`,
     // Register stub session
     await fetch(`${perceptionUrl}/signals`, {
       method: 'POST',
-      headers: withAuth({
+      headers: {
         'Content-Type':  'application/json',
+        ...(perceptionKey ? { 'Authorization': `Bearer ${perceptionKey}` } : {}),
         'X-Project-Id':  info.id,
-      }),
+      },
       body: JSON.stringify({
         signal: {
           turn: {
@@ -196,10 +195,11 @@ No explanation outside the JSON.`,
 
       const res = await fetch(`${perceptionUrl}/signals`, {
         method: 'POST',
-        headers: withAuth({
+        headers: {
           'Content-Type':  'application/json',
+          ...(perceptionKey ? { 'Authorization': `Bearer ${perceptionKey}` } : {}),
           'X-Project-Id':  info.id,
-        }),
+        },
         body: JSON.stringify({
           signal: {
             turn: {
@@ -224,7 +224,7 @@ No explanation outside the JSON.`,
     // 4. Trigger summary regeneration
     await fetch(`${perceptionUrl}/projects/${info.id}/regenerate-summary`, {
       method: 'POST',
-      headers: withAuth({}),
+      headers: perceptionKey ? { 'Authorization': `Bearer ${perceptionKey}` } : {},
     }).catch(() => { /* ignore */ })
 
     return { ok: true, decisionsWritten: written }

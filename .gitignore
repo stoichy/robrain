@@ -1,0 +1,17 @@
+# Dependencies & stores
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+*.tsbuildinfo
+
+# Secrets & local env — never commit
+.env
+.env.*
+!.env.example
+docker/.env
+
+# Tooling / OS
+.DS_Store
+*.log

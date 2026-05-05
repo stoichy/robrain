@@ -20,20 +20,24 @@ import { cwd }                         from 'process'
 interface ReviewOptions {
   session?: string    // 'last' | session_id
   all?:     boolean   // show all decisions, not just last session
+  history?: boolean   // include invalidated decisions to show full lifecycle
   limit?:   number    // max decisions to show (default 20)
 }
 
 interface StoredDecision {
-  id:             string
-  decision:       string
-  rationale:      string | null
-  rejected:       Array<{ option: string; reason: string }>
-  files_affected: string[]
-  confidence:     number
-  scope:          string
-  created_at:     string
-  session_id:     string
-  conflict_flag:  boolean
+  id:              string
+  decision:        string
+  rationale:       string | null
+  rejected:        Array<{ option: string; reason: string }>
+  files_affected:  string[]
+  confidence:      number
+  scope:           string
+  created_at:      string
+  session_id:      string
+  conflict_flag:   boolean
+  supersedes_id:   string | null    // lifecycle: decision this one replaced
+  invalidated_at:  string | null    // lifecycle: when this was superseded
+  superseded_by?:  string | null    // lifecycle: id of decision that replaced this
 }
 
 export async function reviewCommand(opts: ReviewOptions): Promise<void> {
@@ -62,7 +66,8 @@ export async function reviewCommand(opts: ReviewOptions): Promise<void> {
     project_id: info.id,
     limit:      String(limit),
     ...(opts.session && opts.session !== 'last' && { session_id: opts.session }),
-    ...(opts.all     ? { all: 'true' }            : { recent: 'true' }),
+    ...(opts.all     ? { all: 'true' }     : { recent: 'true' }),
+    ...(opts.history ? { history: 'true' } : {}),
   })
 
   let decisions: StoredDecision[] = []
@@ -94,7 +99,12 @@ export async function reviewCommand(opts: ReviewOptions): Promise<void> {
 
   // ── Display header ─────────────────────────────────────────
   console.log(chalk.bold(`  Memory review — ${info.name}`))
-  console.log(chalk.dim(`  ${decisions.length} decision${decisions.length === 1 ? '' : 's'} stored · Project ID: ${info.id}\n`))
+  console.log(chalk.dim(`  ${decisions.length} decision${decisions.length === 1 ? '' : 's'} · Project ID: ${info.id}`))
+  if (opts.history) {
+    console.log(chalk.dim('  Showing full history including superseded decisions\n'))
+  } else {
+    console.log(chalk.dim('  Showing active decisions only · use --history to see full lifecycle\n'))
+  }
 
   // ── Display each decision ──────────────────────────────────
   for (let i = 0; i < decisions.length; i++) {
@@ -105,15 +115,24 @@ export async function reviewCommand(opts: ReviewOptions): Promise<void> {
                 : d.confidence >= 0.6 ? chalk.yellow('medium')
                 : chalk.red('low')
 
-    // Conflict flag warning
-    if (d.conflict_flag) {
-      console.log(chalk.yellow('  ⚠ CONFLICT — needs resolution'))
-    }
+    // Lifecycle state
+    const isSuperseded = !!d.invalidated_at
+    const statusLabel  = isSuperseded
+      ? chalk.dim('  ↩ SUPERSEDED')
+      : d.conflict_flag
+      ? chalk.yellow('  ⚠ CONFLICT — needs resolution')
+      : null
 
-    console.log(`  ${index} ${chalk.bold(d.decision)}`)
+    if (statusLabel) console.log(statusLabel)
+
+    // Decision text — dim if superseded
+    const decisionText = isSuperseded
+      ? chalk.dim(`  ${index} ${d.decision}`)
+      : `  ${index} ${chalk.bold(d.decision)}`
+    console.log(decisionText)
 
     if (d.rationale) {
-      console.log(chalk.dim(`     because: `) + d.rationale)
+      console.log(chalk.dim(`     because: `) + (isSuperseded ? chalk.dim(d.rationale) : d.rationale))
     }
 
     if (d.rejected.length > 0) {
@@ -125,91 +144,121 @@ export async function reviewCommand(opts: ReviewOptions): Promise<void> {
       console.log(chalk.dim(`     files:    `) + d.files_affected.slice(0, 3).join(', ') + (d.files_affected.length > 3 ? ` +${d.files_affected.length - 3} more` : ''))
     }
 
+    // Lifecycle info
+    if (d.supersedes_id) {
+      console.log(chalk.dim(`     ↩ replaces: `) + chalk.dim(`earlier decision (${d.supersedes_id.slice(0, 8)}...)`))
+    }
+    if (isSuperseded && d.invalidated_at) {
+      const supersededDate = new Date(d.invalidated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      console.log(chalk.dim(`     ↪ superseded: ${supersededDate}`))
+    }
+
     console.log(chalk.dim(`     ${date} · confidence: `) + conf + chalk.dim(` · scope: ${d.scope}`))
+
+    // Skip per-decision prompt for superseded decisions in history mode
+    if (isSuperseded) {
+      console.log()
+      continue
+    }
+
+    // ── Per-decision inline action ─────────────────────────
+    const { action } = await prompts({
+      type:    'select',
+      name:    'action',
+      message: 'Action:',
+      choices: [
+        { title: '✔  Accept — looks correct',    value: 'accept'  },
+        { title: '✏️  Edit — fix decision text',  value: 'edit'    },
+        { title: '❌ Reject — delete this',       value: 'reject'  },
+        ...(d.conflict_flag
+          ? [{ title: '⚠️  Resolve conflict',     value: 'resolve' }]
+          : []
+        ),
+        { title: '⏭  Skip remaining',            value: 'skip_all'},
+      ],
+    })
+
     console.log()
+
+    if (!action || action === 'skip_all') break
+
+    if (action === 'edit') {
+      await editDecisionInline(d, percUrl, percKey, info.id)
+    }
+
+    if (action === 'reject') {
+      await rejectDecisionInline(d, percUrl, percKey)
+    }
+
+    if (action === 'resolve') {
+      await resolveConflictInline(d, percUrl, percKey, info.id)
+    }
+    // 'accept' — no action needed, move to next
   }
 
-  // ── Interactive review ─────────────────────────────────────
-  const { action } = await prompts({
-    type:    'select',
-    name:    'action',
-    message: 'What would you like to do?',
-    choices: [
-      { title: 'Done — looks good',              value: 'done' },
-      { title: 'Edit a decision',                value: 'edit' },
-      { title: 'Delete a decision',              value: 'delete' },
-      { title: 'Mark a conflict as resolved',    value: 'resolve' },
-    ],
-  })
-
-  if (!action || action === 'done') {
-    console.log(chalk.green('\n  ✓ Memory review complete\n'))
-    return
-  }
-
-  if (action === 'edit') {
-    await editDecision(decisions, percUrl, percKey, info.id)
-  }
-
-  if (action === 'delete') {
-    await deleteDecision(decisions, percUrl, percKey)
-  }
-
-  if (action === 'resolve') {
-    await resolveConflict(decisions, percUrl, percKey, info.id)
-  }
+  console.log(chalk.green('  ✓ Review complete\n'))
 }
 
-// ── Edit a decision ────────────────────────────────────────────
+// ── Inline: edit a single decision ────────────────────────────
 
-async function editDecision(
-  decisions: StoredDecision[],
+function normalizedRationale(value: string | null | undefined): string | null {
+  if (value == null) return null
+  const t = value.trim()
+  return t === '' ? null : t
+}
+
+async function editDecisionInline(
+  d: StoredDecision,
   percUrl: string,
   percKey: string,
   projectId: string,
 ): Promise<void> {
-  const choices = decisions.map((d, i) => ({
-    title: `[${i + 1}] ${d.decision.slice(0, 60)}${d.decision.length > 60 ? '...' : ''}`,
-    value: d.id,
-  }))
-
-  const { id } = await prompts({
-    type:    'select',
-    name:    'id',
-    message: 'Which decision to edit?',
-    choices,
-  })
-
-  if (!id) return
-
-  const decision = decisions.find(d => d.id === id)!
-
   const { newDecision } = await prompts({
     type:    'text',
     name:    'newDecision',
     message: 'Corrected decision:',
-    initial:  decision.decision,
+    initial:  d.decision,
   })
+
+  if (newDecision == null) {
+    console.log(chalk.dim('  Cancelled.'))
+    return
+  }
+
+  const trimmedDecision = newDecision.trim()
+  if (trimmedDecision === '') {
+    console.log(chalk.dim('  Cancelled.'))
+    return
+  }
+
+  const priorRationale = normalizedRationale(d.rationale)
 
   const { newRationale } = await prompts({
     type:    'text',
     name:    'newRationale',
-    message: 'Corrected rationale (clear field to remove):',
-    initial:  decision.rationale ?? '',
+    message: 'Corrected rationale (blank removes; unchanged text keeps current):',
+    initial:  d.rationale ?? '',
   })
 
-  const spinner = ora('Saving correction...').start()
-
-  // Empty / whitespace-only string clears rationale; cancelled prompt keeps prior value.
+  // Cancelled rationale step — keep prior rationale; decision text may still have changed.
   let correctedRationale: string | null
   if (newRationale == null) {
-    correctedRationale = decision.rationale ?? null
+    correctedRationale = priorRationale
   } else if (newRationale.trim() === '') {
     correctedRationale = null
   } else {
-    correctedRationale = newRationale
+    correctedRationale = newRationale.trim()
   }
 
+  const decisionChanged = trimmedDecision !== d.decision.trim()
+  const rationaleChanged = correctedRationale !== priorRationale
+
+  if (!decisionChanged && !rationaleChanged) {
+    console.log(chalk.dim('  No change made.'))
+    return
+  }
+
+  const spinner = ora('Saving correction...').start()
   try {
     const res = await fetch(`${percUrl}/corrections`, {
       method: 'POST',
@@ -220,58 +269,41 @@ async function editDecision(
         'X-Session-Id':  'robrain-review-cli',
       },
       body: JSON.stringify({
-        decision_id:          id,
-        corrected_decision:   newDecision,
+        decision_id:          d.id,
+        corrected_decision:   trimmedDecision,
         corrected_rationale:  correctedRationale,
         invalidate:           true,
         source:               'user_correction',
       }),
     })
-
-    if (res.ok) {
-      spinner.succeed(`Decision updated. Old version preserved in history.`)
-    } else {
-      spinner.fail('Could not save correction')
-    }
+    res.ok
+      ? spinner.succeed(chalk.green('✔ Decision updated'))
+      : spinner.fail('Could not save correction')
   } catch {
     spinner.fail('Could not reach Perception API')
   }
-
-  console.log()
 }
 
-// ── Delete a decision ──────────────────────────────────────────
+// ── Inline: reject (invalidate) a single decision ─────────────
 
-async function deleteDecision(
-  decisions: StoredDecision[],
+async function rejectDecisionInline(
+  d: StoredDecision,
   percUrl: string,
   percKey: string,
 ): Promise<void> {
-  const choices = decisions.map((d, i) => ({
-    title: `[${i + 1}] ${d.decision.slice(0, 60)}${d.decision.length > 60 ? '...' : ''}`,
-    value: d.id,
-  }))
-
-  const { id } = await prompts({
-    type:    'select',
-    name:    'id',
-    message: 'Which decision to delete?',
-    choices,
-  })
-
-  if (!id) return
-
   const { confirm } = await prompts({
     type:    'confirm',
     name:    'confirm',
-    message: chalk.yellow('This will invalidate the decision. It won\'t be injected in future sessions but stays in history. Continue?'),
+    message: chalk.yellow(`Reject "${d.decision.slice(0, 60)}"? It won't be injected in future sessions.`),
     initial:  false,
   })
 
-  if (!confirm) return
+  if (!confirm) {
+    console.log(chalk.dim('  Skipped.'))
+    return
+  }
 
-  const spinner = ora('Invalidating decision...').start()
-
+  const spinner = ora('Rejecting...').start()
   try {
     const res = await fetch(`${percUrl}/corrections`, {
       method: 'POST',
@@ -280,65 +312,40 @@ async function deleteDecision(
         ...(percKey ? { 'Authorization': `Bearer ${percKey}` } : {}),
       },
       body: JSON.stringify({
-        decision_id: id,
+        decision_id: d.id,
         invalidate:  true,
         source:      'user_correction',
       }),
     })
-
-    if (res.ok) {
-      spinner.succeed('Decision invalidated — won\'t be injected in future sessions.')
-    } else {
-      spinner.fail('Could not invalidate decision')
-    }
+    res.ok
+      ? spinner.succeed(chalk.green('❌ Decision rejected — won\'t appear in future sessions'))
+      : spinner.fail('Could not reject decision')
   } catch {
     spinner.fail('Could not reach Perception API')
   }
-
-  console.log()
 }
 
-// ── Resolve a conflict ─────────────────────────────────────────
+// ── Inline: resolve a conflict ─────────────────────────────────
 
-async function resolveConflict(
-  decisions: StoredDecision[],
+async function resolveConflictInline(
+  d: StoredDecision,
   percUrl: string,
   percKey: string,
   projectId: string,
 ): Promise<void> {
-  const conflicts = decisions.filter(d => d.conflict_flag)
-
-  if (conflicts.length === 0) {
-    console.log(chalk.dim('\n  No pending conflicts.\n'))
-    return
-  }
-
-  const choices = conflicts.map((d, i) => ({
-    title: `[${i + 1}] ${d.decision.slice(0, 60)}`,
-    value: d.id,
-  }))
-
-  const { id } = await prompts({
-    type:    'select',
-    name:    'id',
-    message: 'Which conflict to resolve?',
-    choices,
-  })
-
-  if (!id) return
-
   const { resolution } = await prompts({
     type:    'select',
     name:    'resolution',
-    message: 'How should this be resolved?',
+    message: 'Resolve conflict:',
     choices: [
-      { title: 'Keep this decision — it\'s correct', value: 'keep' },
-      { title: 'Invalidate this — the older decision stands', value: 'invalidate' },
+      { title: '✔  Keep this — it\'s correct',          value: 'keep'       },
+      { title: '❌ Reject this — older decision stands', value: 'invalidate' },
     ],
   })
 
-  const spinner = ora('Resolving conflict...').start()
+  if (!resolution) return
 
+  const spinner = ora('Resolving...').start()
   try {
     const res = await fetch(`${percUrl}/corrections`, {
       method: 'POST',
@@ -349,22 +356,21 @@ async function resolveConflict(
         'X-Session-Id':  'robrain-review-cli',
       },
       body: JSON.stringify({
-        decision_id: id,
+        decision_id: d.id,
         invalidate:  resolution === 'invalidate',
         source:      'user_correction',
       }),
     })
-
     if (res.ok) {
-      spinner.succeed(resolution === 'keep'
-        ? 'Conflict resolved — decision kept and conflict flag cleared.'
-        : 'Conflict resolved — decision invalidated.')
+      resolution === 'keep'
+        ? spinner.succeed(chalk.green('✔ Conflict resolved — decision kept'))
+        : spinner.succeed(chalk.green('❌ Conflict resolved — decision rejected'))
     } else {
       spinner.fail('Could not resolve conflict')
     }
   } catch {
     spinner.fail('Could not reach Perception API')
   }
-
-  console.log()
 }
+
+

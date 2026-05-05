@@ -5,7 +5,7 @@
 // Never blocks. Classifier runs async from this buffer.
 // ─────────────────────────────────────────────────────────────
 
-import type { SessionTurn } from '@context-system/shared'
+import type { SessionTurn } from '@robrain/shared'
 import { config } from './config.js'
 
 interface BufferedTurn {

@@ -112,8 +112,11 @@ export async function injectCommand(opts: InjectOptions): Promise<void> {
     const vetoes = (d.rejected ?? []).map(r => `${r.option} (${r.reason})`).join(' over ')
     const vetoStr = vetoes ? ` over ${vetoes}` : ''
     const rationale = d.rationale ? ` — ${d.rationale}` : ''
+    const supersedes = (d as any).supersedes_id
+      ? ` [supersedes earlier decision]`
+      : ''
 
-    lines.push(`• Chose ${d.decision}${vetoStr}${rationale} [${date}, ${conf} confidence]`)
+    lines.push(`• Chose ${d.decision}${vetoStr}${rationale} [${date}, ${conf} confidence${supersedes}]`)
   }
 
   // Cloud upgrade note (for OSS users)

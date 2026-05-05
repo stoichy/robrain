@@ -8,7 +8,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import type { SessionTurn } from '@context-system/shared'
+import type { SessionTurn } from '@robrain/shared'
 
 import { streamBuffer } from './buffer.js'
 import {

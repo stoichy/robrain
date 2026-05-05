@@ -14,8 +14,8 @@ import type {
   ReplyScore,
   ExtractedDecision,
   Scope,
-} from '@context-system/shared'
-import { THRESHOLDS } from '@context-system/shared'
+} from '@robrain/shared'
+import { THRESHOLDS } from '@robrain/shared'
 import { config } from '../config.js'
 import { embed, cosineDistance } from '../embeddings.js'
 

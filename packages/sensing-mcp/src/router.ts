@@ -4,7 +4,7 @@
 // Stateless. Classifiers do the hard work; router just directs.
 // ─────────────────────────────────────────────────────────────
 
-import type { DecisionSignal, ReplyScore } from '@context-system/shared'
+import type { DecisionSignal, ReplyScore } from '@robrain/shared'
 import { config } from './config.js'
 
 // ── Route decision signal → Perception API ─────────────────
@@ -65,7 +65,7 @@ export async function routeReplyScore(score: ReplyScore): Promise<void> {
 // ── Route raw flush turns → Perception (needs_classification) ─
 
 export async function routeFlushTurns(
-  turns: Array<import('@context-system/shared').SessionTurn>,
+  turns: Array<import('@robrain/shared').SessionTurn>,
   projectId: string,
 ): Promise<void> {
   if (turns.length === 0) return

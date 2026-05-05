@@ -65,9 +65,39 @@ RoBrain stores the veto as structured data. That's the differentiator.
 
 We are not aware of another coding agent memory tool with a first-class rejected alternatives field — but we welcome corrections if that's wrong.
 
----
+## Decision lifecycle — memory that stays honest
 
-## What gets captured — and what doesn't
+Most memory tools have a staleness problem: once something is stored, it stays stored even after it stops being true. CLAUDE.md has the same problem — nobody goes back to clean it up.
+
+RoBrain tracks decision state over time. When you switch from Zustand to Jotai three months later, the old decision isn't deleted — it's invalidated and linked to the new one:
+
+```json
+{
+  "decision": "Use Zustand for state management",
+  "status": "superseded",
+  "superseded_by": "abc123",
+  "created_at": "2024-03-15"
+}
+
+{
+  "decision": "Use Jotai for state management",
+  "rationale": "Zustand caused issues at scale with 50+ stores",
+  "rejected": [{ "option": "Zustand", "reason": "scaling issues with 50+ stores" }],
+  "status": "active",
+  "supersedes": "xyz789",
+  "created_at": "2024-09-02"
+}
+```
+
+The full timeline is always queryable. You can ask "what was the state management decision in March?" and get an accurate answer. You can see the full chain of decisions and why each one changed.
+
+**Why this beats markdown:**
+
+Markdown lies over time. A CLAUDE.md file that says "we use Zustand" is accurate until it isn't, and there's no signal when it becomes false. RoBrain becomes living memory — decisions have a state, a history, and a reason for changing. The agent injecting context from RoBrain knows whether a decision is currently active or was superseded, and why.
+
+This lifecycle tracking happens automatically. When Sensing detects a new decision that contradicts an existing one, Perception flags it and links the two. When you confirm the change via `npx robrain review`, the old decision is invalidated. Nothing is ever deleted — history is always preserved.
+
+---
 
 **Captured:**
 - Architectural decisions made during Claude Code sessions
@@ -86,6 +116,45 @@ We are not aware of another coding agent memory tool with a first-class rejected
 In self-hosted mode: no. Conversation turns are processed by your local Perception API running in Docker and stored in your local Postgres instance. Nothing is sent to Rory Plans or any external service.
 
 When using Rory Plans cloud: conversation turns are sent to Rory Plans' hosted Perception API for extraction. The extracted decision object is stored on Rory Plans infrastructure. Raw conversation text is not retained after extraction.
+
+---
+
+## "Why does this code exist?"
+
+One of the most disorienting experiences in a long-running codebase: you open a file you haven't touched in three months and have no idea why it's structured the way it is.
+
+```bash
+$ npx robrain explain src/store/cart.ts
+
+  src/store/cart.ts — 3 decisions
+
+  • Chose Zustand over Redux (re-render performance issues in cart) — Mar 15 2024
+  • Chose optimistic updates over server-confirmed writes (felt slow to users) — Apr 2 2024
+  • Chose normalised shape over nested objects — Apr 18 2024
+
+  Tip: add --why for full rationale and rejected alternatives
+```
+
+With `--why` for the full picture:
+
+```bash
+$ npx robrain explain src/store/cart.ts --why
+
+  src/store/cart.ts — 3 decisions
+
+  Mar 15 2024  Use Zustand for state management
+               because: Redux caused re-render performance issues in cart
+               rejected: Redux (re-render perf), MobX (team unfamiliar)
+
+  Apr 2 2024   Chose optimistic updates
+               because: server-confirmed felt slow to users
+               rejected: pessimistic updates (bad UX on slow connections)
+
+  Apr 18 2024  Chose normalised shape over nested objects
+               because: query performance at scale
+```
+
+Works on files, directories, or any path RoBrain has seen in a session. Pipe it into a PR description, paste it at the top of a code review, or run it before touching a file you haven't seen in months.
 
 ---
 
@@ -217,12 +286,59 @@ Paste the output into Claude Code before your next task.
 | `npx robrain install --self-hosted` | Wire Sensing MCP into Claude Code / Cursor |
 | `npx robrain init-project` | Warm-start memory from package.json, README, git log |
 | `npx robrain review` | Inspect, edit, or delete captured decisions |
+| `npx robrain review --history` | Show full decision lifecycle including superseded decisions |
 | `npx robrain inject` | Get formatted context to paste into Claude Code |
 | `npx robrain inject --query "..."` | Semantic search for relevant decisions |
 | `npx robrain inject --files "..."` | Get decisions about specific files |
 | `npx robrain inject --copy` | Copy output directly to clipboard |
+| `npx robrain explain <file>` | Answer "why does this code exist?" for any file |
+| `npx robrain explain <file> --why` | Full rationale + rejected alternatives per decision |
 | `npx robrain rule --add "..."` | Add an explicit retrieval rule |
 | `npx robrain status` | Health check |
+
+---
+
+## What the cloud version adds — automatic intelligence
+
+The OSS version gives you capture, storage, and manual retrieval. The Rory Plans cloud version adds two layers that make the system feel genuinely smart rather than just useful.
+
+### Conflict detection
+
+In a long-running project, contradictions accumulate silently. CLAUDE.md has no way to flag them:
+
+```
+March: "Use REST for all API endpoints"
+September: "We're switching to GraphQL"
+```
+
+CLAUDE.md: both lines sit there. No signal.
+
+RoBrain cloud: when Sensing captures the September decision, Perception detects the contradiction against the March decision, classifies it as a reversal, and routes it to Control as a conflict flag. At the next task boundary, Claude sees:
+
+```
+⚠ Conflict detected (Mar 15): Previously chose "REST for all API endpoints"
+and rejected: GraphQL (latency concerns at the time).
+You appear to be reconsidering this — does the prior rejection still apply?
+```
+
+Claude must acknowledge this before proceeding. The contradiction doesn't silently accumulate — it surfaces at the moment it matters.
+
+### Pre-task rejection warnings
+
+The OSS flow is: run `npx robrain inject`, paste context, then work. The cloud version removes the paste step entirely — and adds something the OSS version can't do.
+
+When Control injects context at a task boundary, it scans the current task description against all stored `rejected[]` arrays. If the task mentions something previously ruled out, a warning fires *before* the agent answers:
+
+```
+⚠ Previously rejected: GraphQL — latency concerns at scale
+(Apr 2024, in favour of: REST API). Proceed intentionally if this has changed.
+```
+
+This happens at the right moment — before the agent has suggested anything — not after. It's the difference between a system that reminds you of the past and one that steers you away from known mistakes before they happen.
+
+Both features are built on top of the `rejected[]` field that the OSS version captures. The data is collected in OSS — the intelligence that acts on it is in the cloud.
+
+**Get cloud access:** [roryplans.ai](https://roryplans.ai)
 
 ---
 
@@ -268,25 +384,28 @@ The alternative — CLAUDE.md maintained manually — has zero false positives b
 
 ## OSS vs Rory Plans cloud
 
-The self-hosted version is fully functional for solo developers. The cloud version adds automatic injection — you stop pasting and it just works.
+The self-hosted version captures decisions and lets you retrieve them manually. The cloud version adds the layer that makes retrieval automatic — context arrives in your sessions without you doing anything.
 
 | Feature | OSS self-hosted | Rory Plans cloud |
 |---------|----------------|-----------------|
 | Passive session capture | ✓ | ✓ |
-| `rejected[]` array | ✓ | ✓ |
-| `npx robrain review` CLI | ✓ | ✓ |
+| `rejected[]` field | ✓ | ✓ |
+| Decision lifecycle tracking | ✓ | ✓ |
+| `npx robrain review` | ✓ | ✓ |
 | `npx robrain inject` (manual paste) | ✓ | ✓ |
-| Self-host on your infra | ✓ | — |
-| Basic Haiku extraction | ✓ | ✓ |
-| Calibrated extraction prompt | — | ✓ more accurate |
-| Automatic task-boundary injection | — | ✓ no paste needed |
-| Planning scorer (4-signal relevance) | — | ✓ |
+| Self-host on your infrastructure | ✓ | — |
+| Your data stays local | ✓ | processed remotely |
+| Haiku extraction (functional) | ✓ | ✓ |
+| Calibrated extraction (fewer false positives) | — | ✓ |
+| **Automatic injection at task boundaries** | — | ✓ |
+| **Relevance scoring — surfaces what matters now** | — | ✓ |
 | Web dashboard | — | ✓ |
-| Team memory + scope | — | ✓ |
+| Team memory + shared scope | — | ✓ |
 | Conflict auto-resolution | — | ✓ |
-| Unlimited decisions | up to your Postgres | ✓ |
 
-The OSS extraction prompt is functional but without the calibrated few-shot examples and veto-preserving logic in the cloud version. You'll get most decisions correctly — the cloud version gets you even closer. We'll publish benchmark data once we have enough real-session data to report it honestly.
+The honest difference: OSS gives you the capture and storage layer — decisions go in, you pull them out manually with `npx robrain inject`. The cloud adds the intelligence layer — Planning scores what's relevant to your current task and Control injects it automatically at every task boundary. You stop pasting. Context just arrives.
+
+The extraction quality difference is real but secondary. Both versions use Claude Haiku. The cloud version has a more calibrated prompt that reduces false positives — we'll publish numbers once we have real-session benchmark data. But the bigger gap is automatic injection vs manual paste. That's a workflow change, not just an accuracy improvement.
 
 **Get cloud access:** [roryplans.ai](https://roryplans.ai)
 

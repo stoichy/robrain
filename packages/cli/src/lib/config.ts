@@ -15,9 +15,9 @@ export interface RoMemoryConfig {
   token?:          string        // Rory Plans API token
   email?:          string        // authenticated user email
   perceptionUrl?:  string        // Rory-hosted Perception API URL
+  perceptionKey?:  string        // Perception API key (cloud install; optional self-hosted)
   planningUrl?:    string        // Rory-hosted Planning API URL
-  perceptionKey?:  string        // Perception API key (from provision; empty for self-hosted)
-  planningKey?:    string        // Planning API key (from provision; empty for self-hosted)
+  planningKey?:    string        // Planning API key (cloud)
   embeddingProvider?: string     // openai | voyage | cohere
   embeddingKey?:   string        // embedding API key
   installedAt?:    string        // ISO date of installation

@@ -14,6 +14,7 @@ The user has to do four things, in order. After that it's fully automatic.
 
 ```bash
 # 1. Start the Docker stack (Postgres + Perception)
+#    (run this from the robrain repo root)
 pnpm docker:up
 
 # 2. Install CLI and wire Sensing into Claude Code

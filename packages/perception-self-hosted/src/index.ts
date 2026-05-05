@@ -163,7 +163,11 @@ app.get('/decisions', async (c) => {
   const all        = c.req.query('all') === 'true'
   const history    = c.req.query('history') === 'true'
   const query_text = c.req.query('query')   // for robrain inject semantic search
-  const limit      = Math.min(parseInt(c.req.query('limit') ?? '20'), 100)
+  const limitRaw   = c.req.query('limit') ?? '20'
+  const parsedLimit = Number.parseInt(limitRaw, 10)
+  const limit       = Number.isFinite(parsedLimit) && parsedLimit >= 1
+    ? Math.min(parsedLimit, 100)
+    : 20
 
   if (!projectId) return c.json({ error: 'project_id required' }, 400)
 

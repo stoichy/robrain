@@ -10,21 +10,29 @@ Works across Claude Code, Cursor, and Copilot sessions.
 # Install and start
 git clone https://github.com/roryplans/robrain
 cd robrain && cp docker/.env.example docker/.env
-# Add your ANTHROPIC_API_KEY and OPENAI_API_KEY to docker/.env
+# Add your ANTHROPIC_API_KEY and OPENAI_API_KEY (or another embedding provider) to docker/.env
+pnpm install
 pnpm docker:up
 
+# CLI from this repo (build first, then use node …/dist/index.js)
+pnpm build
+
 # Register Sensing MCP with Claude Code
-npx robrain install --self-hosted
+node packages/cli/dist/index.js install --self-hosted
 
 # Initialize your project
-npx robrain init-project
+node packages/cli/dist/index.js init-project
 
 # After sessions: review what was captured
-npx robrain review
+node packages/cli/dist/index.js review
 
 # Get context to paste into Claude Code
-npx robrain inject --query "auth decisions" --copy
+node packages/cli/dist/index.js inject --query "auth decisions" --copy
 ```
+
+When the CLI is published to npm under a usable package name, you can replace `node packages/cli/dist/index.js` with `npx robrain` or `npx @robrain/cli` (depending on publish settings).
+
+Throughout this README, `npx robrain …` appears as the short form for the CLI; **from a local clone**, run `pnpm build` once and substitute `node packages/cli/dist/index.js` for `npx robrain` (same arguments).
 
 ---
 

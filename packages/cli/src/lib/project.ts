@@ -1,0 +1,235 @@
+// src/lib/project.ts
+// ─────────────────────────────────────────────────────────────
+// Handles project initialization — warm-starts the memory store
+// from existing codebase context (package.json, README, git log,
+// CLAUDE.md) so session 1 starts with knowledge rather than blank.
+// ─────────────────────────────────────────────────────────────
+
+import { existsSync, readFileSync } from 'fs'
+import { join, basename } from 'path'
+import { execSync } from 'child_process'
+import { createHash } from 'crypto'
+
+export interface ProjectInfo {
+  id:          string    // deterministic hash of cwd
+  name:        string    // from package.json name or dirname
+  description: string   // from package.json description or README excerpt
+  stack:       string[] // inferred from package.json dependencies
+  gitLog:      string   // recent commit messages
+  mission:     string   // synthesised project mission
+}
+
+/** Derive a stable project ID from the working directory path */
+export function deriveProjectId(cwd: string): string {
+  return createHash('sha256').update(cwd).digest('hex').slice(0, 12)
+}
+
+/** Collect all available context from the project root */
+export function gatherProjectInfo(cwd: string): ProjectInfo {
+  const id   = deriveProjectId(cwd)
+  let name   = basename(cwd)
+  let desc   = ''
+  let stack: string[] = []
+
+  // package.json
+  const pkgPath = join(cwd, 'package.json')
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
+        name?: string
+        description?: string
+        dependencies?: Record<string, string>
+        devDependencies?: Record<string, string>
+      }
+      if (pkg.name)        name = pkg.name
+      if (pkg.description) desc = pkg.description
+      stack = Object.keys({
+        ...pkg.dependencies,
+        ...pkg.devDependencies,
+      }).slice(0, 20)   // top 20 deps as stack signal
+    } catch { /* ignore */ }
+  }
+
+  // README excerpt (first 500 chars)
+  const readmePaths = ['README.md', 'readme.md', 'README.txt', 'README']
+  let readme = ''
+  for (const rp of readmePaths) {
+    const full = join(cwd, rp)
+    if (existsSync(full)) {
+      readme = readFileSync(full, 'utf8').slice(0, 500)
+      break
+    }
+  }
+  if (!desc && readme) {
+    desc = readme.replace(/^#+\s*/gm, '').replace(/\n+/g, ' ').slice(0, 200)
+  }
+
+  // Git log — last 20 commits
+  let gitLog = ''
+  try {
+    gitLog = execSync('git log --oneline -20', { cwd, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString().trim()
+  } catch { /* not a git repo */ }
+
+  // Synthesise mission from available info
+  const mission = desc
+    ? desc.slice(0, 120)
+    : `${name} — project context being built from sessions`
+
+  return { id, name, description: desc, stack, gitLog, mission }
+}
+
+/** Format project info as context string for Haiku warm-start call */
+export function buildInitContext(info: ProjectInfo): string {
+  const parts: string[] = []
+
+  parts.push(`Project: ${info.name}`)
+  if (info.description) parts.push(`Description: ${info.description}`)
+  if (info.stack.length) parts.push(`Stack: ${info.stack.join(', ')}`)
+  if (info.gitLog) parts.push(`Recent commits:\n${info.gitLog}`)
+
+  return parts.join('\n\n')
+}
+
+/** Call Perception to register project and seed warm-start summary */
+export async function seedProjectMemory(
+  perceptionUrl: string,
+  perceptionKey: string,
+  info: ProjectInfo,
+): Promise<{ ok: boolean; decisionsWritten: number }> {
+  const withAuth = (h: Record<string, string>): Record<string, string> => {
+    if (perceptionKey) h['Authorization'] = `Bearer ${perceptionKey}`
+    return h
+  }
+
+  try {
+    // 1. Register the project
+    await fetch(`${perceptionUrl}/projects`, {
+      method: 'POST',
+      headers: withAuth({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ id: info.id, name: info.name }),
+    })
+
+    // 2. Use Anthropic to infer architectural decisions from context
+    const anthropicKey = process.env.ANTHROPIC_API_KEY
+    if (!anthropicKey) {
+      return { ok: true, decisionsWritten: 0 }
+    }
+
+    const context = buildInitContext(info)
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key':         anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type':      'application/json',
+      },
+      body: JSON.stringify({
+        model:      'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        system: `You infer architectural decisions from project context for an AI memory system.
+Output ONLY valid JSON: an array of decision objects.
+Each object: {"decision": string, "rationale": string|null, "rejected": [], "confidence": number}
+Infer 3-5 decisions visible from the tech stack and project description.
+Examples: database choice, framework choice, architecture pattern, language choice.
+Confidence 0.7 for inferred decisions. Keep rationale under 15 words.
+If not enough context: output [].
+No explanation outside the JSON.`,
+        messages: [{
+          role: 'user',
+          content: `Infer architectural decisions from this project context:\n\n${context}`,
+        }],
+      }),
+    })
+
+    if (!resp.ok) return { ok: true, decisionsWritten: 0 }
+
+    const data = await resp.json() as { content: Array<{ type: string; text: string }> }
+    const text = data.content.find(c => c.type === 'text')?.text ?? '[]'
+
+    let decisions: Array<{
+      decision: string
+      rationale: string | null
+      rejected: unknown[]
+      confidence: number
+    }> = []
+
+    try {
+      decisions = JSON.parse(text.trim())
+      if (!Array.isArray(decisions)) decisions = []
+    } catch { decisions = [] }
+
+    // 3. Seed a stub session for init decisions
+    const sessionId = `init-${info.id}-${Date.now()}`
+
+    // Register stub session
+    await fetch(`${perceptionUrl}/signals`, {
+      method: 'POST',
+      headers: withAuth({
+        'Content-Type':  'application/json',
+        'X-Project-Id':  info.id,
+      }),
+      body: JSON.stringify({
+        signal: {
+          turn: {
+            session_id:    sessionId,
+            sequence:      1,
+            user_message:  'Project initialization scan',
+            claude_reply:  context,
+            files_touched: [],
+            timestamp:     new Date().toISOString(),
+          },
+          decision_type:        'init',
+          confidence:           0.0,    // won't pass confidence gate — just registers session
+          files_affected:       [],
+          scope:                'team',
+          needs_classification: false,
+        },
+      }),
+    }).catch(() => { /* ignore */ })
+
+    // Write each inferred decision
+    let written = 0
+    for (const d of decisions.slice(0, 5)) {
+      if (!d.decision || d.confidence < 0.5) continue
+
+      const res = await fetch(`${perceptionUrl}/signals`, {
+        method: 'POST',
+        headers: withAuth({
+          'Content-Type':  'application/json',
+          'X-Project-Id':  info.id,
+        }),
+        body: JSON.stringify({
+          signal: {
+            turn: {
+              session_id:    sessionId,
+              sequence:      written + 2,
+              user_message:  'init-project scan',
+              claude_reply:  `${d.decision}${d.rationale ? ` because ${d.rationale}` : ''}`,
+              files_touched: [],
+              timestamp:     new Date().toISOString(),
+            },
+            decision_type: 'architectural',
+            confidence:    d.confidence,
+            files_affected: [],
+            scope:         'team',
+          },
+        }),
+      })
+
+      if (res.ok) written++
+    }
+
+    // 4. Trigger summary regeneration
+    await fetch(`${perceptionUrl}/projects/${info.id}/regenerate-summary`, {
+      method: 'POST',
+      headers: withAuth({}),
+    }).catch(() => { /* ignore */ })
+
+    return { ok: true, decisionsWritten: written }
+
+  } catch {
+    return { ok: false, decisionsWritten: 0 }
+  }
+}

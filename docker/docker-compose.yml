@@ -1,0 +1,65 @@
+# docker/docker-compose.yml
+# ─────────────────────────────────────────────────────────────
+# RoBrain self-hosted stack
+# Includes: Postgres + pgvector, Perception API (basic extraction)
+#
+# Quick start:
+#   cp docker/.env.example docker/.env   # fill in ANTHROPIC_API_KEY
+#   docker compose -f docker/docker-compose.yml up -d
+#   docker compose -f docker/docker-compose.yml logs -f perception
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: robrain-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-robrain}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-robrain}
+      POSTGRES_DB:       ${POSTGRES_DB:-robrain}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - robrain_postgres_data:/var/lib/postgresql/data
+      - ../packages/shared/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-robrain}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  perception:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.perception
+    container_name: robrain-perception
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT:              ${PERCEPTION_PORT:-3001}
+      DATABASE_URL:      postgres://${POSTGRES_USER:-robrain}:${POSTGRES_PASSWORD:-robrain}@postgres:5432/${POSTGRES_DB:-robrain}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL:   ${ANTHROPIC_MODEL:-claude-haiku-4-5-20251001}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
+      OPENAI_API_KEY:    ${OPENAI_API_KEY:-}
+      VOYAGE_API_KEY:    ${VOYAGE_API_KEY:-}
+      COHERE_API_KEY:    ${COHERE_API_KEY:-}
+      PERCEPTION_API_KEY: ${PERCEPTION_API_KEY:-}
+      DB_SCHEMA:         context_system
+      # OSS mode — basic extraction, no veto-preserving prompt
+      OSS_MODE:          "true"
+    ports:
+      - "${PERCEPTION_PORT:-3001}:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  robrain_postgres_data:
+    name: robrain_postgres_data

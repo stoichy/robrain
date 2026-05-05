@@ -1,0 +1,23 @@
+# docker/Dockerfile.perception
+FROM node:20-alpine AS builder
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-workspace.yaml* ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/perception-self-hosted/package.json ./packages/perception-self-hosted/
+RUN pnpm install --frozen-lockfile
+COPY packages/shared ./packages/shared
+COPY packages/perception-self-hosted ./packages/perception-self-hosted
+RUN pnpm -r build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+RUN apk add --no-cache curl
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/perception-self-hosted/dist ./packages/perception-self-hosted/dist
+COPY --from=builder /app/packages/perception-self-hosted/package.json ./packages/perception-self-hosted/
+COPY --from=builder /app/node_modules ./node_modules
+ENV NODE_ENV=production
+EXPOSE 3001
+CMD ["node", "packages/perception-self-hosted/dist/index.js"]

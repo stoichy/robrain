@@ -14,6 +14,7 @@ import { streamBuffer } from './buffer.js'
 import {
   classifyDecision,
   classifyTopicShift,
+  getLastClassifierFailure,
   scoreReply,
   clearSessionEmbeddings,
 } from './classifiers/index.js'
@@ -280,6 +281,7 @@ server.tool(
           buffer_size:      bufferStats.total,
           unclassified:     bufferStats.unclassified,
           last_decision_ship_failure: lastDecisionShipFailure,
+          last_classifier_failure: getLastClassifierFailure(),
           perception_url:   config.perceptionApiUrl,
           embedding_provider: config.embeddingProvider,
           topic_shift_embeddings_disabled: config.topicShiftDisableEmbedding,

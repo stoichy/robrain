@@ -2,7 +2,7 @@
 
 **Stop watching your AI agent repeat the same mistakes.**
 
-RoBrain remembers architectural decisions, rationale, and rejected alternatives from your AI coding sessions — so the next session already knows what was tried, what was ruled out, and why.
+RoBrain is shared institutional memory for teams using AI agents — across users, machines, and tools, captured passively with no agent-side discipline required.
 
 Works across Claude Code, Cursor, and Copilot sessions.
 
@@ -383,16 +383,14 @@ The extraction quality difference is real but secondary. Both versions use Claud
 
 **Claude Code Auto memory** is Anthropic’s native persistence: Claude writes notes as it works into machine-local markdown under `~/.claude/projects/…/memory/` ([official docs](https://docs.anthropic.com/en/docs/claude-code/memory)). Roughly the **first ~200 lines or 25 KB** of `MEMORY.md` loads every session; deeper notes live in topic files Claude reads **on demand** with normal file tooling. It ships with **Claude Code v2.1.59+** and needs **no Docker or Postgres**. That makes it the closest competitor to RoBrain’s “capture things without writing MEMORY.md yourself” story — but the **shape of the data** differs.
 
-| | Claude Code Auto memory | RoBrain OSS |
+| Capability | Claude auto-memory | RoBrain |
 |---|---|---|
-| **What gets stored** | Prose notes — preferences, commands, debugging wins, architecture blurbs | **Structured rows**: decision text, `rejected[]`, rationale, `files_affected`, confidence |
-| **Structured vetoes (`rejected[]`)** | Only if it happens to appear in prose | First-class schema field you can query and inject |
-| **File-scoped “why this code?” (`explain`)** | Not modeled as relational file links | Decisions tied to paths RoBrain saw in session |
-| **Retrieval at scale** | Index + topical markdown + on-demand reads | **pgvector** semantic search + CLI filters |
-| **Stale / contradictory decisions** | You edit or delete markdown by hand | Lifecycle: invalidate / supersede / history chain |
-| **Where data lives** | **Local** to one machine (`~/.claude`) — not team git by default | **Your Postgres** — backup, share, inspect with SQL |
-| **Editors** | Claude Code | Any workflow you wire with **MCP** (Claude Code, Cursor, …) |
-| **Setup** | Effectively none | Docker + Postgres + CLI + MCP install |
+| Storage | Local markdown files, per-user, per-machine | Postgres, can be team-shared |
+| Capture mechanism | Active — Claude decides what to write | Passive — every turn auto-classified, Claude doesn't decide |
+| Cross-tool | Claude Code only | Any MCP-capable client (Claude Code, Cursor, etc.) |
+| Recall | Loads `MEMORY.md` index at session start | Always-on summary + semantic search via embeddings |
+| Audit trail | Files only | Full session turn history in DB |
+| New developer joining the project | Sees nothing | Inherits the team's accumulated memory immediately |
 
 **When Auto memory is enough:** solo dev, single editor (Claude Code), repo younger than ~6 months, and you’re fine curating markdown when notes drift.
 

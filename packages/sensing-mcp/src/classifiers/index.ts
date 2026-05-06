@@ -19,6 +19,17 @@ import { THRESHOLDS } from '@robrain/shared'
 import { config } from '../config.js'
 import { embed, cosineDistance } from '../embeddings.js'
 
+function stripMarkdownJsonFence(raw: string): string {
+  const t = raw.trim()
+  const m = t.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  return m?.[1]?.trim() ?? t
+}
+
+let lastClassifierFailure: string | null = null
+export function getLastClassifierFailure(): string | null {
+  return lastClassifierFailure
+}
+
 /** Lazily built so the MCP process can start without ANTHROPIC_API_KEY (Cursor often omits it on reconnect). */
 let anthropicClient: Anthropic | null | undefined
 
@@ -135,11 +146,16 @@ Claude: ${turn.claude_reply}`
       messages:   [{ role: 'user', content: userPrompt }],
     })
 
-    const text = response.content[0].type === 'text' ? response.content[0].text : ''
-    const parsed = JSON.parse(text.trim()) as ExtractedDecision
+    const rawText = response.content[0].type === 'text' ? response.content[0].text : '{}'
+    const text = stripMarkdownJsonFence(rawText)
+    const parsed = JSON.parse(text) as ExtractedDecision
+    lastClassifierFailure = null
     return parsed
-  } catch {
-    // Parse failure = treat as no decision
+  } catch (err) {
+    lastClassifierFailure =
+      `${new Date().toISOString()} ${turn.session_id} seq ${turn.sequence}: ${String(err)}`
+    console.error('[Sensing] Haiku extraction failed:', err)
+    // Parse/provider failure = treat as no decision
     return { decision: null, rationale: null, rejected: [], confidence: 0 }
   }
 }

@@ -52,6 +52,16 @@ const anthropic = new Anthropic({ apiKey: config.anthropicApiKey })
 const app       = new Hono()
 const S         = config.schema
 
+class EmbeddingProviderError extends Error {
+  readonly provider: string
+
+  constructor(provider: string, message: string) {
+    super(message)
+    this.name = 'EmbeddingProviderError'
+    this.provider = provider
+  }
+}
+
 // ── Auth ──────────────────────────────────────────────────────
 app.use('*', async (c, next) => {
   if (config.apiKey) {
@@ -178,6 +188,13 @@ app.post('/signals', async (c) => {
     return c.json({ accepted: true, action: 'written', decision_id: rows[0].id })
   }
   catch (err) {
+    if (err instanceof EmbeddingProviderError) {
+      console.error('[Perception OSS] embedding provider unavailable:', err.provider, err.message)
+      return c.json(
+        { error: 'embedding_provider_unavailable', detail: `[${err.provider}] ${err.message}` },
+        503,
+      )
+    }
     console.error('[Perception OSS] POST /signals error:', err)
     return c.json({ error: 'Internal error', detail: String(err) }, 500)
   }
@@ -486,30 +503,61 @@ Claude: ${claudeReply}`
 async function embed(text: string): Promise<number[]> {
   const TARGET = 1536
   const pad = (v: number[]) => v.length >= TARGET ? v.slice(0, TARGET) : [...v, ...new Array(TARGET - v.length).fill(0)]
+  const parseErrorDetail = async (r: Response): Promise<string> => {
+    const raw = await r.text().catch(() => '')
+    if (!raw) return `HTTP ${r.status}`
+    try {
+      const parsed = JSON.parse(raw) as { error?: unknown; message?: unknown; detail?: unknown }
+      if (typeof parsed.error === 'string') return parsed.error
+      if (parsed.error && typeof parsed.error === 'object' && typeof (parsed.error as { message?: unknown }).message === 'string') {
+        return (parsed.error as { message: string }).message
+      }
+      if (typeof parsed.message === 'string') return parsed.message
+      if (typeof parsed.detail === 'string') return parsed.detail
+    } catch {
+      // non-JSON payload
+    }
+    return raw.slice(0, 500)
+  }
+  const ensureEmbedding = (provider: string, vector: unknown): number[] => {
+    if (!Array.isArray(vector) || !vector.every(n => typeof n === 'number' && Number.isFinite(n))) {
+      throw new EmbeddingProviderError(provider, 'Invalid embedding payload')
+    }
+    return vector as number[]
+  }
 
   if (config.embeddingProvider === 'voyage' && config.voyageApiKey) {
     const r = await fetch('https://api.voyageai.com/v1/embeddings', {
       method: 'POST', headers: { 'Authorization': `Bearer ${config.voyageApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'voyage-3-lite', input: [text] }),
     })
-    const d = await r.json() as { data: [{ embedding: number[] }] }
-    return pad(d.data[0].embedding)
+    if (!r.ok) {
+      throw new EmbeddingProviderError('voyage', await parseErrorDetail(r))
+    }
+    const d = await r.json() as { data?: Array<{ embedding?: unknown }> }
+    return pad(ensureEmbedding('voyage', d.data?.[0]?.embedding))
   }
   if (config.embeddingProvider === 'cohere' && config.cohereApiKey) {
     const r = await fetch('https://api.cohere.com/v1/embed', {
       method: 'POST', headers: { 'Authorization': `Bearer ${config.cohereApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'embed-english-v3.0', texts: [text], input_type: 'search_document', embedding_types: ['float'] }),
     })
-    const d = await r.json() as { embeddings: { float: number[][] } }
-    return pad(d.embeddings.float[0])
+    if (!r.ok) {
+      throw new EmbeddingProviderError('cohere', await parseErrorDetail(r))
+    }
+    const d = await r.json() as { embeddings?: { float?: unknown[] } }
+    return pad(ensureEmbedding('cohere', d.embeddings?.float?.[0]))
   }
   // Default: OpenAI
   const r = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST', headers: { 'Authorization': `Bearer ${config.openaiApiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: 'text-embedding-3-small', input: text }),
   })
-  const d = await r.json() as { data: [{ embedding: number[] }] }
-  return pad(d.data[0].embedding)
+  if (!r.ok) {
+    throw new EmbeddingProviderError('openai', await parseErrorDetail(r))
+  }
+  const d = await r.json() as { data?: Array<{ embedding?: unknown }> }
+  return pad(ensureEmbedding('openai', d.data?.[0]?.embedding))
 }
 
 async function regenerateSummary(projectId: string): Promise<void> {

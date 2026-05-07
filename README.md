@@ -571,6 +571,8 @@ The alternative — CLAUDE.md maintained manually — has zero false positives b
 
 ### Database schema
 
+**Mid-session DB inspection:** Sensing buffers turns in-process ([`packages/sensing-mcp/src/buffer.ts`](packages/sensing-mcp/src/buffer.ts)) and flushes raw rows to Postgres when `sensing_end_session` runs; decisions are written asynchronously on the classifier path—so seeing **0** `session_turns` while decisions already exist is expected, not a bug.
+
 The `decisions` table is the core of RoBrain. Open source, Apache 2.0.
 
 ```sql

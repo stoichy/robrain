@@ -5,6 +5,7 @@
 // Exposes four tools to Claude Code via stdio transport.
 // ─────────────────────────────────────────────────────────────
 
+import { randomBytes } from 'node:crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -42,6 +43,16 @@ const activeSessions = new Map<string, ActiveSession>()
 /** Last Perception POST /signals failure for diagnostics (sensing_get_status). */
 let lastDecisionShipFailure: string | null = null
 
+function generateSessionId(): string {
+  return `${new Date().toISOString()}-${randomBytes(2).toString('hex')}`
+}
+
+function resolveSessionId(raw: string | null | undefined): string {
+  if (raw == null) return generateSessionId()
+  const t = raw.trim()
+  return t.length > 0 ? t : generateSessionId()
+}
+
 // ── MCP Server setup ───────────────────────────────────────
 
 const server = new McpServer({
@@ -57,14 +68,18 @@ const server = new McpServer({
 
 server.tool(
   'sensing_start_session',
-  'Signal the start of a new Claude Code session. Call this once at the beginning of every session. Returns the always-on project summary to inject into your context.',
+  'Signal the start of a new Claude Code session. Call this once at the beginning of every session. Returns the always-on project summary to inject into your context. session_id may be omitted or empty — the server generates a unique id and returns it (use that id for sensing_record_turn and sensing_end_session).',
   {
     project_id:  z.string().describe('Repository name or path hash identifying the project'),
-    session_id:  z.string().describe('Unique identifier for this session (e.g. timestamp + random)'),
+    session_id:  z.string().nullish().describe(
+      'Unique id for this session. Omit, use null, or "" to let the server generate one (recommended). Otherwise supply a fresh id per chat (e.g. ISO timestamp + 4 hex chars).',
+    ),
     working_dir: z.string().describe('Absolute path to the project root directory'),
   },
   async ({ project_id, session_id, working_dir }) => {
-    activeSessions.set(session_id, {
+    const sessionId = resolveSessionId(session_id)
+
+    activeSessions.set(sessionId, {
       project_id,
       started_at: new Date(),
       turn_count:  0,
@@ -74,14 +89,14 @@ server.tool(
     // For now, return placeholder until Perception is wired
     const summaryResult = await fetchAlwaysOnSummary(project_id)
 
-    console.error(`[Sensing] Session started: ${session_id} (${project_id}) @ ${working_dir}`)
+    console.error(`[Sensing] Session started: ${sessionId} (${project_id}) @ ${working_dir}`)
 
     return {
       content: [{
         type: 'text',
         text: JSON.stringify({
           status: summaryResult.registrationError ? 'project_not_registered' : 'ready',
-          session_id,
+          session_id: sessionId,
           project_id,
           always_on_summary: summaryResult.text,
           ...(summaryResult.registrationError

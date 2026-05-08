@@ -19,6 +19,7 @@ import { initProjectCommand }  from './commands/init-project.js'
 import { statusCommand, ruleCommand, logoutCommand } from './commands/status.js'
 import { reviewCommand }       from './commands/review.js'
 import { injectCommand }       from './commands/inject.js'
+import { exportMemoryCommand } from './commands/export-memory.js'
 import { explainCommand }      from './commands/explain.js'
 import { projectsListCommand, projectsMergeCommand } from './commands/projects.js'
 
@@ -70,6 +71,18 @@ program
   .option('-a, --all',            'Include all matching decisions, not just top scored')
   .action(async (opts: { query?: string; files?: string; copy?: boolean; limit?: number; all?: boolean }) => {
     await injectCommand(opts)
+  })
+
+// ── export-memory ─────────────────────────────────────────────
+
+program
+  .command('export-memory')
+  .description('Project approved decisions into Claude Code\'s auto-memory directory (no paste needed)')
+  .option('--dry-run',           'Preview what would be written without touching disk')
+  .option('--include-unreviewed', 'Also export decisions that haven\'t been approved (not recommended)')
+  .option('--to <dir>',          'Write to a custom memory dir (default: ~/.claude/projects/<slug>/memory)')
+  .action(async (opts: { dryRun?: boolean; includeUnreviewed?: boolean; to?: string }) => {
+    await exportMemoryCommand(opts)
   })
 
 // ── install ───────────────────────────────────────────────────
@@ -186,6 +199,7 @@ program.addHelpText('afterAll', `
     npx robrain init-project                        Warm-start memory from codebase
     npx robrain review                              Review captured decisions
     npx robrain inject --query "..." --copy         Get context to paste into Claude Code
+    npx robrain export-memory                       Project approved decisions into Claude Code auto-memory
     npx robrain explain src/store/cart.ts           Why does this file look this way?
 
   Cloud quick start (automatic injection, no paste):

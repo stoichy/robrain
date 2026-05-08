@@ -539,6 +539,32 @@ The developer needs two habits:
 
 Everything else — capture, extraction, storage, embedding — happens without you doing anything.
 
+### Stale Perception Docker image (migrations / schema out of sync)
+
+If you **pulled new code** but did **not rebuild** the `perception` service, the container may still run an **older** Perception binary than `packages/perception-self-hosted` on disk. Then startup migrations (for example `reviewed_at` on `decisions`) never run, `robrain review` approval can fail against the DB the CLI is using, and features that assume the new schema break in confusing ways.
+
+From the **repo root** (same directory as `.env` and `docker/docker-compose.yml`):
+
+```bash
+docker compose -f docker/docker-compose.yml --env-file .env build perception
+docker compose -f docker/docker-compose.yml --env-file .env up -d perception
+```
+
+If Docker reused layers and you still see old behavior, force a clean rebuild:
+
+```bash
+docker compose -f docker/docker-compose.yml --env-file .env build --no-cache perception
+docker compose -f docker/docker-compose.yml --env-file .env up -d perception
+```
+
+Sanity check:
+
+```bash
+curl -sf "http://localhost:${PERCEPTION_PORT:-3001}/health"
+```
+
+**Note:** A **brand-new** Postgres volume applies `packages/shared/schema.sql` on first boot. **Existing** volumes rely on Perception’s **idempotent startup migrations** when you run an up-to-date image — so after upgrading, rebuild and restart `perception` once.
+
 ---
 
 ## Follow-ups (TODO)

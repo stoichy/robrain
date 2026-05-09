@@ -90,9 +90,13 @@ export interface IngestSignalRequest {
 
 export interface IngestSignalResponse {
   accepted: boolean
-  decision_id?: string             // set if written to DB
-  action: 'written' | 'discarded' | 'queued_for_contradiction_check'
+  decision_id?: string             // set when action is 'written'
+  action: 'written' | 'discarded' | 'deduped' | 'queued_for_contradiction_check'
   message?: string
+  /** When action is `deduped`: existing row that blocked a near-duplicate insert. */
+  matched_decision_id?: string
+  matched_reviewed?: boolean
+  similarity?: number
 }
 
 /** POST /scores — Control → Perception (feedback loop) */
@@ -259,5 +263,7 @@ export const THRESHOLDS = {
   DECISION_CONFIDENCE_HIGH:  0.90,   // above = write immediately
   TOPIC_SHIFT_EMBEDDING:     0.35,   // cosine distance to trigger shift
   SIMILARITY_LINK:           0.82,   // above = check for contradiction
+  /** Cosine similarity (1 - distance) ≥ this → skip INSERT as near-duplicate (Perception POST /signals). */
+  DECISION_DEDUP_SIMILARITY: 0.85,
   RECENCY_HALF_LIFE_DAYS:    30,     // recency score halves every 30 days
 } as const

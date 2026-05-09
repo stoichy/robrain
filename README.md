@@ -548,6 +548,14 @@ Sanity check:
 curl -sf "http://localhost:${PERCEPTION_PORT:-3001}/health"
 ```
 
+**After shared types change** (`packages/shared`): downstream packages read **`@robrain/shared` types from `dist/`**. From repo root run **`pnpm --filter @robrain/shared build`** (or **`pnpm -r build`**) before relying on **`pnpm typecheck`** or publishing — otherwise `packages/*/dist/*.d.ts` can lag **`packages/shared/src`**.
+
+**Verify the running container matches your checkout:** tail Perception logs while exercising capture — you should see current behavior (for example embedding dedupe logs as **`POST /signals deduped`** with matched decision text when a near-duplicate is skipped):
+
+```bash
+docker compose -f docker/docker-compose.yml logs -f --tail=80 perception
+```
+
 **Note:** A **brand-new** Postgres volume applies `packages/shared/schema.sql` on first boot. **Existing** volumes rely on Perception’s **idempotent startup migrations** when you run an up-to-date image — so after upgrading, rebuild and restart `perception` once.
 
 ---

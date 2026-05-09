@@ -184,6 +184,44 @@ app.post('/signals', async (c) => {
     // Embed the decision
     const embedding = await embed(`${extracted.decision}. ${extracted.rationale ?? ''}`)
 
+    // Near-duplicate: skip INSERT if an active same-scope decision is already this close in embedding space
+    const dedupMin = THRESHOLDS.DECISION_DEDUP_SIMILARITY
+    const { rows: nearest } = await pool.query<{
+      id: string
+      decision: string
+      reviewed_at: Date | null
+      similarity: number
+    }>(`
+      SELECT d.id, d.decision, d.reviewed_at,
+             1 - (d.embedding <=> $1::vector) AS similarity
+      FROM ${S}.decisions d
+      WHERE d.project_id = $2
+        -- Scopes are intentional partitions (user/local/team/global), so dedup stays in-scope.
+        AND d.scope = $3
+        AND d.invalidated_at IS NULL
+        AND d.embedding IS NOT NULL
+      ORDER BY d.embedding <=> $1::vector
+      LIMIT 1
+    `, [JSON.stringify(embedding), projectId, signal.scope])
+
+    const match = nearest[0]
+    if (match && Number(match.similarity) >= dedupMin) {
+      const simRounded = Number(Number(match.similarity).toFixed(3))
+      const matchedDecision = match.decision.length > 120
+        ? `${match.decision.slice(0, 117)}...`
+        : match.decision
+      console.info(
+        `[Perception OSS] POST /signals deduped vs ${match.id} "${matchedDecision}" (similarity=${simRounded}, reviewed=${match.reviewed_at != null})`,
+      )
+      return c.json({
+        accepted: true,
+        action:               'deduped',
+        matched_decision_id:  match.id,
+        matched_reviewed:     match.reviewed_at != null,
+        similarity:           simRounded,
+      })
+    }
+
     const { rows } = await pool.query<{ id: string }>(`
       INSERT INTO ${S}.decisions (
         project_id, session_id, decision, rationale,

@@ -26,7 +26,7 @@ function parsePerceptionUserMessage(status: number, rawText: string): string {
 
 // ── Route decision signal → Perception API ─────────────────
 
-/** Returns persisted=true only when Perception persisted the decision ({ accepted:true, action:'written' }). */
+/** Returns persisted=true when Perception stored a new row (`written`) or intentionally merged away a duplicate (`deduped`). */
 export async function routeDecisionSignal(
   signal: DecisionSignal,
   projectId: string,
@@ -71,7 +71,7 @@ export async function routeDecisionSignal(
       return { persisted: false, userFacing: 'Perception returned invalid JSON for /signals.' }
     }
 
-    if (!payload.accepted || payload.action !== 'written') {
+    if (!payload.accepted) {
       const soft = [payload.message].filter(Boolean).join(' ')
       console.error(
         '[Sensing] Perception did not persist signal:',
@@ -83,7 +83,21 @@ export async function routeDecisionSignal(
         userFacing: soft || 'Perception did not persist this signal (discarded or below threshold).',
       }
     }
-    return { persisted: true }
+
+    if (payload.action === 'written' || payload.action === 'deduped') {
+      return { persisted: true }
+    }
+
+    const softFallback = [payload.message].filter(Boolean).join(' ')
+    console.error(
+      '[Sensing] Perception did not persist signal:',
+      payload.action,
+      payload.message ?? '',
+    )
+    return {
+      persisted: false,
+      userFacing: softFallback || 'Perception did not persist this signal.',
+    }
   } catch (err) {
     console.error('[Sensing] Failed to reach Perception API:', err)
     return {

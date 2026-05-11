@@ -33,7 +33,7 @@ export async function statusCommand(): Promise<void> {
   console.log(chalk.dim('  └ ID:        ') + info.id)
   console.log()
 
-  // Ping Perception for live stats
+  // Ping Perception for live stats + decision count for this project (helps spot silent Sensing)
   if (config.perceptionUrl) {
     try {
       const res = await fetch(`${config.perceptionUrl}/health`)
@@ -42,6 +42,21 @@ export async function statusCommand(): Promise<void> {
       } else {
         console.log(chalk.dim('  Perception:  ') + chalk.yellow('○ unreachable'))
       }
+      try {
+        const pr = await fetch(`${config.perceptionUrl}/projects`, {
+          headers: config.perceptionKey ? { Authorization: `Bearer ${config.perceptionKey}` } : {},
+        })
+        if (pr.ok) {
+          const data = await pr.json() as {
+            projects?: Array<{ id: string; decision_count?: number }>
+          }
+          const row = data.projects?.find(p => p.id === info.id)
+          const n     = row?.decision_count
+          if (typeof n === 'number') {
+            console.log(chalk.dim('  Decisions:   ') + (n === 0 ? chalk.yellow(String(n)) : String(n)) + chalk.dim(` (active rows for project ${info.id})`))
+          }
+        }
+      } catch { /* ignore count */ }
     } catch {
       console.log(chalk.dim('  Perception:  ') + chalk.yellow('○ unreachable'))
     }
@@ -84,15 +99,13 @@ export async function ruleCommand(opts: {
   const config  = readConfig()
   const info    = gatherProjectInfo(cwd())
   const planUrl = config.planningUrl
-
-  if (!planUrl) {
-    console.log(chalk.red('  ✗ Planning URL not configured. Run: robrain install'))
-    process.exit(1)
-  }
-
   const planKey = config.planningKey ?? ''
 
   if (opts.add) {
+    if (!planUrl) {
+      console.log(chalk.red('  ✗ Planning URL not configured. Run: robrain install (cloud)'))
+      process.exit(1)
+    }
     const factType = opts.type === 'always_include' ? 'force_include'
                    : opts.type === 'always_exclude' ? 'force_exclude'
                    : 'preference'
@@ -122,8 +135,38 @@ export async function ruleCommand(opts: {
   }
 
   if (opts.list) {
+    if (!planUrl) {
+      console.log(chalk.bold('  Planning rules\n'))
+      console.log(chalk.dim('  OSS self-hosted has no Planning service — `mem0_facts` / rules are not in Perception.'))
+      console.log(chalk.dim('  Use Rory Plans cloud (`planningUrl` in config) for `robrain rule`, or manage prompts in your editor.'))
+      console.log()
+      return
+    }
     console.log(chalk.bold('  Active rules\n'))
-    console.log(chalk.dim('  (rules are managed via Claude Code — use control_add_rule or robrain rule --add)'))
+    try {
+      const res = await fetch(
+        `${planUrl.replace(/\/$/, '')}/facts?project_id=${encodeURIComponent(info.id)}`,
+        { headers: planKey ? { Authorization: `Bearer ${planKey}` } : {} },
+      )
+      if (!res.ok) {
+        console.log(chalk.yellow(`  Could not list rules (${res.status}). This Planning URL may not expose GET /facts.`))
+        console.log()
+        return
+      }
+      const data = await res.json().catch(() => ({})) as { facts?: Array<{ id?: string; content?: string; fact_type?: string }> }
+      const facts = Array.isArray(data.facts) ? data.facts : []
+      if (facts.length === 0) {
+        console.log(chalk.dim('  No rules stored for this project yet.'))
+      } else {
+        for (const f of facts) {
+          const id = f.id ?? '?'
+          const t  = f.fact_type ?? 'preference'
+          console.log(chalk.dim(`  • [${id}] ${t}: `) + (f.content ?? ''))
+        }
+      }
+    } catch {
+      console.log(chalk.yellow('  Could not reach Planning API to list rules.'))
+    }
     console.log()
     return
   }

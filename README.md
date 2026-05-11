@@ -10,6 +10,7 @@ Works across Claude Code, Cursor, and Copilot sessions.
 
 - [Overview](#overview)
 - [Install and usage](#install-and-usage)
+  - [What ships today](#what-ships-today)
   - [Synthesis](#synthesis)
 - [CLI commands](#cli-commands)
 - [OSS vs Rory Plans cloud](#oss-vs-rory-plans-cloud)
@@ -78,21 +79,25 @@ RoBrain uses Anthropic (Haiku) for decision extraction/classification and a sepa
 
 ## Install and usage
 
-### Setup — four steps, then fully automatic
+### Setup checklist, then automatic capture
 
-The user has to do four things, in order. After that it's fully automatic.
+From the **robrain clone**, install dependencies and **build** once (so `sensing-mcp` is compiled before `install` copies it into `~/.robrain/mcp`). Then start Docker, wire editors, and init each app repo.
 
-**One-time setup (do once, ever):**
+**One-time (robrain repo):**
 
 ```bash
+pnpm install && pnpm build
+
 # 1. Start the Docker stack (Postgres + Perception)
-#    (run this from the robrain repo root)
 pnpm docker:up
 
-# 2. Install CLI and wire Sensing into Claude Code
-npx robrain install --self-hosted
+# 2. Install CLI and wire Sensing into Claude Code (pass --repo-root so MCP bundle exists)
+npx robrain install --self-hosted --repo-root "$(pwd)"
+```
 
-# 3. Initialize your project (run in your repo root)
+**One-time (each application repo):**
+
+```bash
 cd /path/to/your/project
 npx robrain init-project
 ```
@@ -151,7 +156,7 @@ This improves reliability when Cursor does not consistently follow general instr
 
 ### Architecture
 
-Six components. Two run locally alongside Claude Code. In self-hosted mode, two run on your infrastructure (Postgres + Perception). Planning API and Control MCP are cloud-only.
+Seven components. Two run locally alongside Claude Code (**Sensing**, **CLI**). On your infrastructure or Rory Plans: **Postgres**, **Perception**, **Synthesis** (batch job over the same DB — not on the hot session path), **Planning API** (cloud only), **Control MCP** (cloud only). In self-hosted OSS, Postgres and Perception run continuously; Synthesis you run on demand or on a schedule against `DATABASE_URL`.
 
 ```
 Developer machine:
@@ -161,15 +166,112 @@ Developer machine:
 Your infrastructure / Rory Plans:
   Postgres        ← decisions table with rejected[] + pgvector (schema open source)
   Perception API  ← extracts + stores decisions (self-hosted: basic | cloud: calibrated)
+  Synthesis       ← batch read of decisions → planning_blocks / flags (OSS: `pnpm synthesis:run` or `npx robrain synth`)
   Planning API    ← ranks relevant memories per task (cloud only)
   Control MCP     ← auto-injects context at task boundaries (cloud only)
 ```
 
-### Synthesis (Coming soon)
+### What ships today
 
-Synthesis is a scheduled background pass that re-reads RoBrain's decision corpus to cluster by topic, detect contradictions and stance-drift across sessions, promote recurring entities into first-class entries, and surface what's missing — turning a reactive decision log into memory that compounds on its own.
+The launch story is what you can run **now** (OSS self-hosted and CLI), not roadmap vapor:
 
-And it's worth noting: this is the thing that separates RoBrain from Auto Memory most clearly at the architecture level. Auto Memory captures and retrieves. Synthesis means the memory reflects on itself. That's a qualitatively different capability — and it's the one that makes the "memory that compounds on its own" claim true rather than just aspirational.
+- **Systematic passive capture** — Sensing records turns; Perception extracts decisions without the agent deciding what to remember.
+- **`rejected[]` as structured, queryable data** — vetoes are first-class fields in Postgres, not prose buried in markdown.
+- **Decision lifecycle** — active vs superseded rows, linked history, and review flows so memory can stay honest over time.
+- **Team-shared store** — Postgres as the source of truth across machines and editors (with MCP on Claude Code, Cursor, Copilot-capable setups).
+- **`npx robrain explain <file>`** — file-scoped “why does this exist?” from stored decisions.
+- **Conflict visibility** — decisions can be flagged for contradiction; **`robrain review`** resolves them in OSS. Rory Plans cloud adds proactive warnings at task boundaries (see [OSS vs Rory Plans cloud](#oss-vs-rory-plans-cloud)).
+
+That combination already goes beyond most “agent memory” products that stop at capture or grep.
+
+### Synthesis
+
+**Synthesis does not create or capture anything new.** It only reads what is already in the **`decisions`** table (plus sessions for `project_id`) and writes derived artefacts — mainly **`planning_blocks`**, **`conflict_flag` / `decision_relations`**, and logs. The reactive pipeline (Sensing → Perception) still owns every new decision row.
+
+#### The gap Synthesis fills
+
+Sensing and Perception are **reactive**: a session runs, one decision is extracted and written, done. Each write is considered **in isolation**. Nothing in that path ever reads the **whole corpus** after six months of work.
+
+So you can end up with hundreds of rows nobody has read as a single picture: contradictions accumulate, the team’s stance on testing shifts across sessions, **Redux** shows up fifteen times as a rejected alternative without any one place that answers “what role does Redux play here?” — and none of that surfaces unless someone goes looking by hand.
+
+**Synthesis is the job that looks at the full table.**
+
+#### Pass 1 — Where has the team’s position drifted?
+
+Synthesis clusters architectural decisions by **topic area** (state management, auth, database, testing, API design, …), orders each cluster **chronologically**, and asks whether **recent** rows disagree with **earlier** consensus. When drift is real, it surfaces a plain-language signal — e.g. *your stance on state management is changing: earlier decisions committed to Zustand; recent ones move toward Jotai.*
+
+It also writes a **compiled-truth** summary per topic into **`planning_blocks`**: one pre-compressed sentence (with vetoes preserved where the summariser is instructed to keep them) so downstream retrieval does not have to re-read fifteen state-management decisions on every store touch. Cheaper context, same substance.
+
+**Review alignment:** clustering and drift detection see **every active** decision (`invalidated_at IS NULL`). The **compiled_truth** sentence is built **only from decisions you have approved in `robrain review`** (`reviewed_at IS NOT NULL`). Topics with no reviewed rows in the cluster skip `compiled_truth` until someone approves at least one row — so the line matches the same trust bar as export/injection, while drift can still call out emerging change from pending rows. Pass 1 prompts label each row **`[approved]`** vs **`[pending review]`** so the model weights stable approvals more heavily when forming clusters.
+
+#### Pass 2 — Which decisions contradict each other but were never compared?
+
+At **write time**, Perception mainly compares a new decision to neighbours that share **files** or are **semantically very similar** to the new embedding. It can **miss** pairs that are architecturally incompatible but live in different parts of the repo — e.g. session 12: *all external API calls must be idempotent* vs session 47: *use fire-and-forget for webhook delivery* (different files, never linked at insert time).
+
+Synthesis runs a **corpus-wide** pass: find candidate pairs (same **scope**, high embedding similarity, no relation row yet), ask a small model to classify the pair, then write **`decision_relations`** accordingly:
+
+- **`conflicts_with`** (+ **`conflict_flag`**) when the model says they cannot both be true.
+- **`extends`** when the second decision **builds on** the first without contradicting it (direction: newer message in the prompt extends the earlier one, stored as an edge for graph consumers).
+- **`related_to`** when they are compatible peers on the same topic.
+
+Incremental mode (default) only re-checks pairs touched since **`projects.last_synthesis_at`**, unless you disable it (see env vars below). Resolving “keep both” in **`robrain review`** can record **`related_to`** (via the counterpart id) so Pass 2 does not re-flag the same pair forever.
+
+#### Pass 3 — What recurring entity has no structured entry?
+
+If **Redis** (or any library, service, or pattern) appears across many decisions — chosen, rejected, or only in rationale — but there is no compact row a human or tool can point at, every “what does Redis do here?” question devolves into reading a dozen raw decisions.
+
+Synthesis **promotes** those entities into **`planning_blocks`**: a one-line synthesis plus enough context to back-link into the underlying decisions, so **`robrain explain`**, inject paths, and Control can prefer **one line** instead of replaying the whole scatter.
+
+#### Corpus shape: before and after
+
+| Before synthesis | After synthesis |
+|------------------|-----------------|
+| A flat table of decisions, retrievable by recency or semantic similarity | Topic clusters with **compiled-truth** rows per area |
+| Contradictions only if the reactive matcher saw them | Additional **cross-corpus** contradictions flagged and linked |
+| Recurring tools only implicit in many rows | **Named entity** blocks for things that keep showing up |
+
+#### Why this matters for `robrain explain`
+
+Without synthesis, **`npx robrain explain src/api/webhooks.ts`** is largely “the most relevant decision rows touching this file.” With synthesis-fed **`planning_blocks`** and relation flags in place, the same command can lean on **pre-summarised topic truth** and **conflicts the reactive path never wired** — e.g. the idempotency vs fire-and-forget tension that only appears when something reads the whole corpus.
+
+#### OSS runner
+
+The batch job lives in **`packages/synthesis`** as **`@robrain/synthesis`**. From the **robrain repo root** (with `.env` loaded):
+
+```bash
+pnpm synthesis:build
+pnpm synthesis:run
+pnpm synthesis:dry-run
+```
+
+Equivalent: `pnpm --filter @robrain/synthesis build|start`, or **`npx robrain synth`**, which runs the same filter with `pnpm`’s cwd set to the monorepo root. The CLI resolves that root from **`ROBRAIN_REPO`** if set; otherwise **`../../../..`** from this module’s compiled path (`packages/cli/dist/commands/`), i.e. the published package layout. The package also publishes a **`robrain-synth`** bin after `pnpm synthesis:build`.
+
+It uses the **same `DATABASE_URL` / `DB_SCHEMA` / `ANTHROPIC_API_KEY`** as Perception (see repo `.env`). Optional **`ANTHROPIC_MODEL`** overrides the default Haiku model id. The package depends on **`@anthropic-ai/sdk` ^0.32** and marks fixed system prompts with **ephemeral prompt cache**, so repeated cron runs pay less for identical system text.
+
+**`planning_blocks`** supports **`topic`** + **`last_refreshed_at`** and a **partial unique index** on `(project_id, block_type, topic)` for upserts; **`projects.last_synthesis_at`** drives incremental Pass 2.
+
+**CLI wrapper:** `npx robrain synth` (from a checkout) forwards to the same job with optional **`--dry-run`**, **`--full`** (disable incremental Pass 2), **`--lookback <days>`**, **`--project <id>`** (sets `SYNTHESIS_PROJECT_ID`).
+
+**Useful env vars** (all optional except the three DB/API keys above):
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `SYNTHESIS_DRY_RUN` | off | When `true`, no DB writes (`pnpm synthesis:dry-run` sets this). |
+| `SYNTHESIS_INCREMENTAL` | `true` | Set to `false` to re-scan all Pass 2 candidate pairs. |
+| `SYNTHESIS_LOOKBACK_DAYS` | `0` | Limit Pass 1 decision rows to the last *N* days (`0` = all time). |
+| `SYNTHESIS_MIN_CLUSTER` | `3` | Minimum decisions before Pass 1 runs. |
+| `SYNTHESIS_CONT_THRESHOLD` | shared `THRESHOLDS.SIMILARITY_LINK` | Pass 2 similarity floor (cosine as `1 − distance`). |
+| `SYNTHESIS_ENTITY_MIN` | `3` | Minimum mentions to promote an entity in Pass 3. |
+| `SYNTHESIS_PASS1_CHUNK` | `50` | Decisions per clustering prompt chunk. |
+| `SYNTHESIS_PASS2_CONCURRENCY` | `4` | Parallel Haiku calls in Pass 2. |
+| `SYNTHESIS_PROJECT_ID` | *(all projects)* | Restrict the run to one `projects.id`. |
+| `SYNTHESIS_EXPORT_MEMORY` | off | When `true`, after **new `compiled_truth`** rows, runs **`robrain export-memory --cwd <stored> --project-id …`** (needs `working_directory` on `projects`, set by **`robrain init-project`**). **`ROBRAIN_REPO`** overrides the monorepo root for that subprocess if needed. |
+
+**Perception (F1):** semantic **`GET /decisions?query=…`** ranks the top vector neighbours with a **`planning_score`** using shared **`SCORING_WEIGHTS`** (semantic + file overlap + recency + `historical_relevance` + **`APPROVAL_STATE`** from `reviewed_at`). **`robrain inject --files`** forwards paths as **`boost_files`** so file overlap participates.
+
+**Perception (F7):** additive DDL ships as versioned SQL under **`packages/perception-self-hosted/migrations/`** (`001_*.sql`, …) and a **`schema_migrations`** ledger — startup runs any unapplied file. Docker images include that folder next to **`dist/`**.
+
+**Contributors welcome:** tighter `explain` / inject consumption of `planning_blocks`, eval sets, and scheduling examples — open issues or PRs.
 
 ### Quick start — self-hosted
 
@@ -216,7 +318,7 @@ curl http://localhost:3001/health
 pnpm install && pnpm build
 
 # Install the local package globally — then use robrain normally:
-pnpm install -g /absolute/path/to/robrain/robrain/packages/cli
+pnpm install -g /absolute/path/to/robrain/packages/cli
 
 # Register Sensing MCP (pass repo root so ~/.robrain/mcp/sensing is populated)
 npx robrain install --self-hosted --repo-root "$(pwd)" --perception-url http://localhost:3001
@@ -250,7 +352,7 @@ npx robrain inject --query "payment flow decisions" --copy
 # Get context for specific files
 npx robrain inject --files "src/api/payments.ts,src/store/cart.ts" --copy
 
-# Get all recent decisions
+# Up to 100 unreviewed decisions (Perception cap) for a big paste block
 npx robrain inject --all --copy
 ```
 
@@ -266,17 +368,23 @@ Paste the output into Claude Code before your next task.
 | `npx robrain init-project` | Warm-start memory from package.json, README, git log |
 | `npx robrain projects list` | List Perception projects with session/decision counts (recover phantom ids) |
 | `npx robrain projects merge <from-id> <to-id>` | Merge one project id into another in the database |
-| `npx robrain review` | Inspect, edit, or delete captured decisions |
+| `npx robrain review` | Inspect, edit, or delete captured decisions; conflict **“keep”** can persist a **`related_to`** edge when Perception returns a counterpart id so Synthesis stops re-flagging the pair |
 | `npx robrain review --history` | Show full decision lifecycle including superseded decisions |
-| `npx robrain export-memory` | Export approved decisions into Claude Code auto-memory files |
+| `npx robrain review --approve-all` | Bulk-approve every reviewable decision in the current fetch (no prompts per row) |
+| `npx robrain export-memory` | Export approved decisions into Claude Code auto-memory files; optional **`--cwd`** / **`--project-id`** for non-interactive paths (Synthesis F2) |
 | `npx robrain inject` | Get formatted context to paste into Claude Code |
 | `npx robrain inject --query "..."` | Semantic search for relevant decisions |
 | `npx robrain inject --files "..."` | Get decisions about specific files |
 | `npx robrain inject --copy` | Copy output directly to clipboard |
+| `npx robrain inject --all` | Request up to **100** decisions (server cap): all **unreviewed** without `--query`, or a wider semantic pool with `--query` |
 | `npx robrain explain <file>` | Answer "why does this code exist?" for any file |
 | `npx robrain explain <file> --why` | Full rationale + rejected alternatives per decision |
-| `npx robrain rule --add "..."` | Add an explicit retrieval rule |
-| `npx robrain status` | Health check |
+| `npx robrain explain <file> --copy` | Copy explain output to the clipboard |
+| `npx robrain rule --add "..."` | Add a Planning rule (**Rory Plans cloud** — requires `planningUrl` in config) |
+| `npx robrain rule --list` | List rules from Planning **`GET /facts`** when cloud is configured; OSS-only prints guidance |
+| `npx robrain status` | Auth + Perception/Planning health + **active decision count** for the current project |
+| `pnpm synthesis:run` | **[Synthesis](#synthesis)** — batch job from **robrain repo root** (`pnpm` must resolve `@robrain/synthesis`) |
+| `npx robrain synth` | Same job via CLI: optional **`--dry-run`**, **`--full`**, **`--lookback <n>`**, **`--project <id>`**. Resolves the robrain monorepo from this CLI package unless **`ROBRAIN_REPO`** is set (needed for some global installs). |
 
 ## "Why does this code exist?"
 
@@ -514,7 +622,7 @@ Claude Code doesn't always follow `CLAUDE.md` instructions reliably — this is 
 npx robrain status
 ```
 
-If `Decisions: 0` after a session where you made architectural choices, Claude probably didn't call the tools. The fix is to make the `CLAUDE.md` instructions more explicit or remind Claude at the start of the session: *"please follow the RoBrain instructions in CLAUDE.md."*
+That prints Perception connectivity and a **`Decisions:`** count for the current project (from **`GET /projects`**). If **`Decisions: 0`** after a session where you expected captures, Claude may not have called the Sensing tools, or Perception rejected writes — run **`npx robrain review`** to confirm what is stored. The fix is often to make `CLAUDE.md` more explicit or remind Claude: *"follow the RoBrain instructions in CLAUDE.md."*
 
 **The practical reality:**
 
@@ -567,8 +675,6 @@ Tracked improvements not yet implemented in this repo:
 - **Stable project identity.** Replace cwd-hash `project_id` with a content-based id where possible: hash of `git config --get remote.origin.url` (normalized), with a `.robrain/project.json` UUID fallback for non-git or no-remote repos — plus a migration story for existing DB rows. Survives `mv`, `cp -r`, and nested clones without orphaning decisions.
 
 **Shipped recently:** Perception **404** responses include an actionable **`hint`** (copy tells users to run **`npx robrain init-project`** from the project root). Sensing MCP surfaces **`perception_error`** / **`perception_write_error`** in tool JSON; **`install`** chains **`init-project`** by default (`--skip-init-project` to opt out); **`robrain projects list`** / **`merge`** help repair fragmented installs.
-
-You can open matching GitHub issues locally with `./scripts/create-follow-up-issues.sh` (requires [`gh`](https://cli.github.com/) and `gh auth login`).
 
 ---
 

@@ -10,7 +10,7 @@
 //
 // What the Rory Plans cloud version adds on top:
 //   - Veto-preserving extraction prompt (calibrated + few-shot)
-//   - Planning scorer (4-signal relevance ranking)
+//   - Planning scorer (5-signal relevance ranking incl. approval)
 //   - Automatic context injection via Control MCP
 //   - Conflict auto-resolution
 //   - Web dashboard
@@ -23,7 +23,8 @@ import { serve }             from '@hono/node-server'
 import Anthropic             from '@anthropic-ai/sdk'
 import pg                    from 'pg'
 import { z }                 from 'zod'
-import { THRESHOLDS }        from '@robrain/shared'
+import { SCORING_WEIGHTS, THRESHOLDS } from '@robrain/shared'
+import { applySqlMigrations } from './migrate.js'
 
 const { Pool } = pg
 
@@ -196,7 +197,7 @@ app.post('/signals', async (c) => {
              1 - (d.embedding <=> $1::vector) AS similarity
       FROM ${S}.decisions d
       WHERE d.project_id = $2
-        -- Scopes are intentional partitions (user/local/team/global), so dedup stays in-scope.
+        -- Same-scope only: 'team' and 'user' decisions are intentional partitions, never dedup across.
         AND d.scope = $3
         AND d.invalidated_at IS NULL
         AND d.embedding IS NOT NULL
@@ -207,11 +208,11 @@ app.post('/signals', async (c) => {
     const match = nearest[0]
     if (match && Number(match.similarity) >= dedupMin) {
       const simRounded = Number(Number(match.similarity).toFixed(3))
-      const matchedDecision = match.decision.length > 120
-        ? `${match.decision.slice(0, 117)}...`
+      const matchedSnippet = match.decision.length > 80
+        ? `${match.decision.slice(0, 80)}…`
         : match.decision
-      console.info(
-        `[Perception OSS] POST /signals deduped vs ${match.id} "${matchedDecision}" (similarity=${simRounded}, reviewed=${match.reviewed_at != null})`,
+      console.log(
+        `[Perception OSS] POST /signals deduped vs ${match.id} (similarity=${simRounded}, reviewed=${match.reviewed_at != null}) :: "${matchedSnippet}"`,
       )
       return c.json({
         accepted: true,
@@ -264,7 +265,8 @@ app.get('/decisions', async (c) => {
   const all        = c.req.query('all') === 'true'
   const recent     = c.req.query('recent') === 'true'
   const history    = c.req.query('history') === 'true'
-  const query_text = c.req.query('query')   // for robrain inject semantic search
+  const query_text   = c.req.query('query')   // for robrain inject semantic search
+  const boostFilesRaw = c.req.query('boost_files') // comma paths — F1 file_overlap in planning_score
   const limitRaw   = c.req.query('limit') ?? '20'
   const parsedLimit = Number.parseInt(limitRaw, 10)
   const limit       = Number.isFinite(parsedLimit) && parsedLimit >= 1
@@ -279,34 +281,83 @@ app.get('/decisions', async (c) => {
   try {
     let rows: unknown[]
 
+    const conflictCounterpartSql = `(
+      SELECT CASE WHEN r.from_id = d.id THEN r.to_id ELSE r.from_id END
+      FROM ${S}.decision_relations r
+      WHERE (r.from_id = d.id OR r.to_id = d.id) AND r.relation = 'conflicts_with'
+      ORDER BY r.created_at DESC
+      LIMIT 1
+    ) AS conflict_counterpart_id`
+
     // `robrain review` filters out user-approved decisions so the feed shows
     // only what still needs attention. `robrain review --history` and
     // `robrain inject` (semantic search) both ignore reviewed_at because they
     // want full visibility / retrieval coverage.
     if (query_text) {
-      // Semantic search for robrain inject
+      // Semantic search — F1: composite planning_score (shared SCORING_WEIGHTS) over vector neighbours.
       const embedding = await embed(query_text)
-      const result = await pool.query(`
-        SELECT d.id, d.decision, d.rationale, d.rejected,
-               d.files_affected, d.confidence, d.scope,
-               d.created_at, d.session_id, d.conflict_flag,
-               d.supersedes_id, d.invalidated_at, d.reviewed_at,
-               1 - (d.embedding <=> $1::vector) AS similarity
-        FROM ${S}.decisions d
-        JOIN ${S}.sessions s ON s.id = d.session_id
-        WHERE s.project_id = $2
-          AND d.invalidated_at IS NULL
-          AND d.embedding IS NOT NULL
-        ORDER BY d.embedding <=> $1::vector
-        LIMIT $3
-      `, [JSON.stringify(embedding), projectId, limit])
+      const w  = SCORING_WEIGHTS
+      const hl = THRESHOLDS.RECENCY_HALF_LIFE_DAYS
+      const boostPaths = (boostFilesRaw ?? '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+
+      const scoreExpr = `
+            (${w.SEMANTIC_SIMILARITY} * similarity
+             + ${w.FILE_OVERLAP} * file_overlap_score
+             + ${w.RECENCY} * recency_score
+             + ${w.HISTORICAL_RELEVANCE} * historical_relevance
+             + ${w.APPROVAL_STATE} * (CASE WHEN reviewed_at IS NOT NULL THEN 1.0 ELSE 0.0 END)
+            )::float AS planning_score`
+
+      const nearestSelect = (fileOverlapExpr: string) => `
+            SELECT d.id, d.decision, d.rationale, d.rejected,
+                   d.files_affected, d.confidence, d.scope,
+                   d.created_at, d.session_id, d.conflict_flag,
+                   d.supersedes_id, d.invalidated_at, d.reviewed_at,
+                   d.historical_relevance,
+                   ${conflictCounterpartSql},
+                   1 - (d.embedding <=> $1::vector) AS similarity,
+                   POWER(0.5, LEAST(3650, EXTRACT(EPOCH FROM (NOW() - d.created_at)) / 86400.0) / ${hl}) AS recency_score,
+                   ${fileOverlapExpr} AS file_overlap_score
+            FROM ${S}.decisions d
+            JOIN ${S}.sessions s ON s.id = d.session_id
+            WHERE s.project_id = $2
+              AND d.invalidated_at IS NULL
+              AND d.embedding IS NOT NULL
+            ORDER BY d.embedding <=> $1::vector
+            LIMIT 120`
+
+      const fileOverlapFromBoost = `
+                   LEAST(1.0,
+                     COALESCE(cardinality(ARRAY(SELECT UNNEST(d.files_affected) INTERSECT SELECT UNNEST($4::text[]))), 0)::float
+                     / GREATEST(1, cardinality($4::text[])))`
+
+      const result = boostPaths.length === 0
+        ? await pool.query(`
+          WITH nearest AS (${nearestSelect('0.0::float')})
+          SELECT *, ${scoreExpr}
+          FROM nearest
+          ORDER BY planning_score DESC NULLS LAST, similarity DESC
+          LIMIT $3
+        `, [JSON.stringify(embedding), projectId, limit])
+        : await pool.query(`
+          WITH nearest AS (${nearestSelect(fileOverlapFromBoost)})
+          SELECT *, ${scoreExpr}
+          FROM nearest
+          ORDER BY planning_score DESC NULLS LAST, similarity DESC
+          LIMIT $3
+        `, [JSON.stringify(embedding), projectId, limit, boostPaths])
+
       rows = result.rows
     } else if (sessionId) {
       const result = await pool.query(`
         SELECT d.id, d.decision, d.rationale, d.rejected,
                d.files_affected, d.confidence, d.scope,
                d.created_at, d.session_id, d.conflict_flag,
-               d.supersedes_id, d.invalidated_at, d.reviewed_at
+               d.supersedes_id, d.invalidated_at, d.reviewed_at,
+               ${conflictCounterpartSql}
         FROM ${S}.decisions d
         WHERE d.session_id = $1
           AND d.invalidated_at IS NULL
@@ -320,7 +371,8 @@ app.get('/decisions', async (c) => {
         SELECT d.id, d.decision, d.rationale, d.rejected,
                d.files_affected, d.confidence, d.scope,
                d.created_at, d.session_id, d.conflict_flag,
-               d.supersedes_id, d.invalidated_at, d.reviewed_at
+               d.supersedes_id, d.invalidated_at, d.reviewed_at,
+               ${conflictCounterpartSql}
         FROM ${S}.decisions d
         JOIN ${S}.sessions s ON s.id = d.session_id
         WHERE s.project_id = $1
@@ -335,7 +387,8 @@ app.get('/decisions', async (c) => {
         SELECT d.id, d.decision, d.rationale, d.rejected,
                d.files_affected, d.confidence, d.scope,
                d.created_at, d.session_id, d.conflict_flag,
-               d.supersedes_id, d.invalidated_at, d.reviewed_at
+               d.supersedes_id, d.invalidated_at, d.reviewed_at,
+               ${conflictCounterpartSql}
         FROM ${S}.decisions d
         JOIN ${S}.sessions s ON s.id = d.session_id
         WHERE s.project_id = $1
@@ -348,7 +401,8 @@ app.get('/decisions', async (c) => {
         SELECT d.id, d.decision, d.rationale, d.rejected,
                d.files_affected, d.confidence, d.scope,
                d.created_at, d.session_id, d.conflict_flag,
-               d.supersedes_id, d.invalidated_at, d.reviewed_at
+               d.supersedes_id, d.invalidated_at, d.reviewed_at,
+               ${conflictCounterpartSql}
         FROM ${S}.decisions d
         JOIN ${S}.sessions s ON s.id = d.session_id
         WHERE s.project_id = $1
@@ -431,6 +485,8 @@ app.post('/corrections', async (c) => {
     approve?:                  boolean
     /** From robrain review "keep this decision" conflict resolution — clears flag + marks reviewed. */
     resolved_conflict_keep?:   boolean
+    /** When set with resolved_conflict_keep: other decision id so Pass 2 skips re-flagging this pair (related_to edge). */
+    counterpart_id?:           string
     source:                    string
   }>()
 
@@ -455,6 +511,15 @@ app.post('/corrections', async (c) => {
           updated_at = now()
       WHERE id = $1
     `, [body.decision_id])
+
+    if (body.counterpart_id && body.counterpart_id !== body.decision_id) {
+      await pool.query(`
+        INSERT INTO ${S}.decision_relations (from_id, to_id, relation)
+        VALUES ($1, $2, 'related_to')
+        ON CONFLICT DO NOTHING
+      `, [body.decision_id, body.counterpart_id])
+    }
+
     return c.json({ accepted: true, action: 'conflict_resolved_kept' })
   }
 
@@ -495,12 +560,20 @@ app.post('/corrections', async (c) => {
 
 // ── POST /projects — upsert project ───────────────────────────
 app.post('/projects', async (c) => {
-  const { id, name } = await c.req.json<{ id: string; name: string }>()
+  const { id, name, working_directory } = await c.req.json<{
+    id: string
+    name: string
+    working_directory?: string | null
+  }>()
   await pool.query(`
-    INSERT INTO ${S}.projects (id, name)
-    VALUES ($1, $2)
-    ON CONFLICT (id) DO UPDATE SET last_session_at = now(), updated_at = now()
-  `, [id, name])
+    INSERT INTO ${S}.projects (id, name, working_directory)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (id) DO UPDATE SET
+      name = EXCLUDED.name,
+      working_directory = COALESCE(EXCLUDED.working_directory, ${S}.projects.working_directory),
+      last_session_at = now(),
+      updated_at = now()
+  `, [id, name, working_directory ?? null])
   return c.json({ accepted: true })
 })
 
@@ -511,10 +584,11 @@ app.get('/projects', async (c) => {
       id: string
       name: string
       updated_at: Date
+      working_directory: string | null
       session_count: string
       decision_count: string
     }>(`
-      SELECT p.id, p.name, p.updated_at,
+      SELECT p.id, p.name, p.updated_at, p.working_directory,
         (SELECT COUNT(*)::text FROM ${S}.sessions s WHERE s.project_id = p.id) AS session_count,
         (SELECT COUNT(*)::text FROM ${S}.decisions d WHERE d.project_id = p.id AND d.invalidated_at IS NULL) AS decision_count
       FROM ${S}.projects p
@@ -522,11 +596,12 @@ app.get('/projects', async (c) => {
     `)
     return c.json({
       projects: rows.map(r => ({
-        id:             r.id,
-        name:           r.name,
-        updated_at:     r.updated_at,
-        session_count:  Number.parseInt(r.session_count, 10) || 0,
-        decision_count: Number.parseInt(r.decision_count, 10) || 0,
+        id:                 r.id,
+        name:               r.name,
+        updated_at:         r.updated_at,
+        working_directory:  r.working_directory,
+        session_count:      Number.parseInt(r.session_count, 10) || 0,
+        decision_count:     Number.parseInt(r.decision_count, 10) || 0,
       })),
     })
   } catch (err) {
@@ -560,6 +635,11 @@ app.post('/projects/merge', async (c) => {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await client.query(`
+      UPDATE ${S}.projects SET working_directory = COALESCE(working_directory, (
+        SELECT working_directory FROM ${S}.projects WHERE id = $2
+      )) WHERE id = $1
+    `, [to, from])
     await client.query(`UPDATE ${S}.sessions SET project_id = $1 WHERE project_id = $2`, [to, from])
     await client.query(`UPDATE ${S}.decisions SET project_id = $1 WHERE project_id = $2`, [to, from])
     await client.query(`UPDATE ${S}.mem0_facts SET project_id = $1 WHERE project_id = $2`, [to, from])
@@ -780,23 +860,8 @@ async function regenerateSummary(projectId: string): Promise<void> {
   }
 }
 
-// ── Migrations ────────────────────────────────────────────────
-// Idempotent ALTERs for installs that predate a schema change.
-// Fresh installs already get these columns from schema.sql.
-async function runMigrations(): Promise<void> {
-  await pool.query(`
-    ALTER TABLE ${S}.decisions
-      ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ
-  `)
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_decisions_unreviewed
-      ON ${S}.decisions(project_id)
-      WHERE invalidated_at IS NULL AND reviewed_at IS NULL
-  `)
-}
-
 // ── Start ──────────────────────────────────────────────────────
-runMigrations()
+applySqlMigrations(pool, S)
   .then(() => {
     serve({ fetch: app.fetch, port: config.port }, () => {
       console.log(`[RoBrain Perception OSS] Running on port ${config.port} — mode: ${config.ossMode ? 'self-hosted' : 'cloud'}`)

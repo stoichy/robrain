@@ -126,6 +126,7 @@ export async function initProjectCommand(opts: InitProjectOptions): Promise<void
     config.perceptionUrl!,
     perceptionKey,
     { ...info, id: resolvedProjectId },
+    projectRoot,
   )
 
   if (result.ok && result.decisionsWritten > 0) {

@@ -113,6 +113,8 @@ export interface CorrectionRequest {
   approve?: boolean                // true = mark as user-approved (exclusive of invalidate)
   /** Clear conflict_flag and treat as reviewed (robrain review: "keep this" for conflicts). */
   resolved_conflict_keep?: boolean
+  /** With resolved_conflict_keep: the other decision in the pair — stores related_to so Synthesis Pass 2 skips the pair. */
+  counterpart_id?: string
   source: 'user_correction' | 'claude_disagreement'
 }
 
@@ -249,12 +251,16 @@ export const TOKEN_BUDGETS = {
   PLANNING_MAX:      500,
 } as const
 
-/** Scoring weights for Planning */
+/**
+ * Planning / retrieval composite weights (sum = 1.0).
+ * F1: `APPROVAL_STATE` is user review (`reviewed_at`) — bumps trusted decisions in ranked lists.
+ */
 export const SCORING_WEIGHTS = {
-  SEMANTIC_SIMILARITY:    0.35,
-  FILE_OVERLAP:           0.30,
-  RECENCY:                0.20,
-  HISTORICAL_RELEVANCE:   0.15,
+  SEMANTIC_SIMILARITY:    0.32,
+  FILE_OVERLAP:           0.27,
+  RECENCY:                0.18,
+  HISTORICAL_RELEVANCE:   0.13,
+  APPROVAL_STATE:         0.10,
 } as const
 
 /** Classifier thresholds */

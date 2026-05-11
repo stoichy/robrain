@@ -37,9 +37,11 @@ export async function injectCommand(opts: InjectOptions): Promise<void> {
 
   // ── Build query ────────────────────────────────────────────
   // If no query provided, use recent decisions
-  const query   = opts.query
-  const files   = opts.files ? opts.files.split(',').map(f => f.trim()) : []
-  const limit   = opts.limit ?? 5
+  const query      = opts.query
+  const files      = opts.files ? opts.files.split(',').map(f => f.trim()) : []
+  const userLimit  = opts.limit ?? 5
+  /** Perception caps at 100; `--all` requests the max for broader paste context. */
+  const fetchLimit = opts.all ? 100 : Math.min(100, Math.max(1, userLimit))
 
   const spinner = ora({ text: 'Fetching relevant decisions...', color: 'green' }).start()
 
@@ -59,10 +61,16 @@ export async function injectCommand(opts: InjectOptions): Promise<void> {
     // Build query params
     const params = new URLSearchParams({
       project_id: info.id,
-      limit:      String(limit),
+      limit:      String(fetchLimit),
     })
-    if (query)  params.set('query', query)
-    if (!query) params.set('recent', 'true')
+    if (query) {
+      params.set('query', query)
+    } else if (opts.all) {
+      params.set('all', 'true')
+    } else {
+      params.set('recent', 'true')
+    }
+    if (files.length > 0) params.set('boost_files', files.join(','))
 
     const res = await fetch(`${percUrl}/decisions?${params}`, {
       headers: percKey ? { 'Authorization': `Bearer ${percKey}` } : {},

@@ -36,6 +36,8 @@ interface StoredDecision {
   created_at:      string
   session_id:      string
   conflict_flag:   boolean
+  /** Other decision id when conflict_flag and a conflicts_with edge exists (for corrections). */
+  conflict_counterpart_id?: string | null
   supersedes_id:   string | null    // lifecycle: decision this one replaced
   invalidated_at:  string | null    // lifecycle: when this was superseded
   reviewed_at?:    string | null    // lifecycle: when the user explicitly approved (older Perception versions omit)
@@ -493,6 +495,9 @@ async function resolveConflictInline(
         decision_id:              d.id,
         invalidate:             resolution === 'invalidate',
         resolved_conflict_keep: resolution === 'keep',
+        ...(resolution === 'keep' && d.conflict_counterpart_id
+          ? { counterpart_id: d.conflict_counterpart_id }
+          : {}),
         source:                   'user_correction',
       }),
     })

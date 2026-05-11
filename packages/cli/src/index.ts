@@ -19,11 +19,12 @@ import { initProjectCommand }  from './commands/init-project.js'
 import { statusCommand, ruleCommand, logoutCommand } from './commands/status.js'
 import { reviewCommand }       from './commands/review.js'
 import { injectCommand }       from './commands/inject.js'
+import { synthCommand }        from './commands/synth.js'
 import { exportMemoryCommand } from './commands/export-memory.js'
 import { explainCommand }      from './commands/explain.js'
 import { projectsListCommand, projectsMergeCommand } from './commands/projects.js'
 
-const VERSION = '0.2.1'
+const VERSION = '0.3.0'
 
 program
   .name('robrain')
@@ -70,9 +71,27 @@ program
   .option('-f, --files <files>',  'Comma-separated files in scope (boosts file-overlapping decisions)')
   .option('-c, --copy',           'Copy output directly to clipboard')
   .option('-l, --limit <n>',      'Max decisions to include (default: 5)', parseInt)
-  .option('-a, --all',            'Include all matching decisions, not just top scored')
+  .option('-a, --all',            'Fetch up to 100 decisions (Perception cap): all unreviewed when no --query, or broader semantic results with --query')
   .action(async (opts: { query?: string; files?: string; copy?: boolean; limit?: number; all?: boolean }) => {
     await injectCommand(opts)
+  })
+
+// ── synth — Synthesis batch job ───────────────────────────────
+
+program
+  .command('synth')
+  .description('Run cross-decision Synthesis (drift, contradictions, entities) via @robrain/synthesis')
+  .option('--dry-run', 'Compute prompts but do not write to the database')
+  .option('--full', 'Disable incremental mode — re-check all contradiction candidate pairs')
+  .option('--lookback <days>', 'Only consider decisions newer than N days', parseInt)
+  .option('--project <id>', 'Limit to one project id')
+  .action(async (opts: { dryRun?: boolean; full?: boolean; lookback?: number; project?: string }) => {
+    await synthCommand({
+      dryRun:   opts.dryRun,
+      full:     opts.full,
+      lookback: opts.lookback,
+      project:  opts.project,
+    })
   })
 
 // ── export-memory ─────────────────────────────────────────────
@@ -83,7 +102,9 @@ program
   .option('--dry-run',           'Preview what would be written without touching disk')
   .option('--include-unreviewed', 'Also export decisions that haven\'t been approved (not recommended)')
   .option('--to <dir>',          'Write to a custom memory dir (default: ~/.claude/projects/<slug>/memory)')
-  .action(async (opts: { dryRun?: boolean; includeUnreviewed?: boolean; to?: string }) => {
+  .option('--cwd <path>',        'Project root for Claude memory slug + stack detection (default: current directory)')
+  .option('--project-id <id>',   'Perception project id when it differs from the path-derived id')
+  .action(async (opts: { dryRun?: boolean; includeUnreviewed?: boolean; to?: string; cwd?: string; projectId?: string }) => {
     await exportMemoryCommand(opts)
   })
 
@@ -154,7 +175,7 @@ projectsCmd
 
 program
   .command('status')
-  .description('Show authentication status and service health')
+  .description('Show authentication status, service health, and Perception decision count for this project')
   .action(async () => {
     await statusCommand()
   })
@@ -163,7 +184,7 @@ program
 
 program
   .command('rule')
-  .description('Manage explicit Planning rules for this project')
+  .description('Manage explicit Planning rules (Rory Plans cloud Planning API — not OSS Perception)')
   .option('--add <text>',    'Add a new rule in plain language')
   .option('--list',          'List active rules for this project')
   .option('--remove <id>',   'Remove a rule by ID')
@@ -196,13 +217,15 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
 
 program.addHelpText('afterAll', `
   Self-hosted quick start:
+    pnpm install && pnpm build                      In the robrain clone (builds sensing-mcp before install)
     pnpm docker:up                                  Start Postgres + Perception
-    npx robrain install --self-hosted               Wire Sensing into Claude Code
+    npx robrain install --self-hosted --repo-root <robrain-clone>   Wire Sensing (needs built MCP bundle)
     npx robrain init-project                        Warm-start memory from codebase
     npx robrain review                              Review captured decisions
     npx robrain inject --query "..." --copy         Get context to paste into Claude Code
     npx robrain export-memory                       Project approved decisions into Claude Code auto-memory
     npx robrain explain src/store/cart.ts           Why does this file look this way?
+    npx robrain synth --dry-run                     Run Synthesis from the robrain clone (needs DATABASE_URL + ANTHROPIC_API_KEY)
 
   Cloud quick start (automatic injection, no paste):
     npx robrain install --token YOUR_TOKEN      Authenticate with Rory Plans

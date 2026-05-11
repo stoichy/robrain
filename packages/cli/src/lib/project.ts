@@ -99,6 +99,8 @@ export async function seedProjectMemory(
   perceptionUrl: string,
   perceptionKey: string,
   info: ProjectInfo,
+  /** Absolute project root — stored on Perception for post-Synthesis `export-memory` (F2). */
+  workingDirectory: string,
 ): Promise<{ ok: boolean; decisionsWritten: number }> {
   try {
     // 1. Register the project (required for sessions / signals FK chain)
@@ -108,7 +110,7 @@ export async function seedProjectMemory(
         'Content-Type':  'application/json',
         ...(perceptionKey ? { 'Authorization': `Bearer ${perceptionKey}` } : {}),
       },
-      body: JSON.stringify({ id: info.id, name: info.name }),
+      body: JSON.stringify({ id: info.id, name: info.name, working_directory: workingDirectory }),
     })
     if (!regRes.ok) {
       const detail = await regRes.text().catch(() => '')

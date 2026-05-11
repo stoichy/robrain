@@ -1,6 +1,6 @@
 // packages/cli/src/commands/export-memory.ts
 // ─────────────────────────────────────────────────────────────
-// robrain export-memory [--dry-run] [--include-unreviewed] [--to DIR]
+// robrain export-memory [--dry-run] [--include-unreviewed] [--to DIR] [--cwd PATH] [--project-id ID]
 //
 // Projects RoBrain's approved decision corpus into Claude Code's
 // auto-memory directory so decisions surface automatically in
@@ -33,7 +33,7 @@ import {
 import { join } from 'path'
 import { cwd }                     from 'process'
 import { readConfig }              from '../lib/config.js'
-import { gatherProjectInfo }       from '../lib/project.js'
+import { gatherProjectInfo, type ProjectInfo } from '../lib/project.js'
 import {
   defaultMemoryDir,
   memoryIndexPath,
@@ -45,6 +45,10 @@ interface ExportOptions {
   dryRun?:            boolean
   includeUnreviewed?: boolean
   to?:                string
+  /** Project root for memory paths + stack detection (default: cwd). */
+  cwd?:               string
+  /** Override Perception `project_id` when it differs from path-derived id. */
+  projectId?:        string
 }
 
 interface Decision {
@@ -77,12 +81,16 @@ const FRONTMATTER_SOURCE = 'source: robrain'
 export async function exportMemoryCommand(opts: ExportOptions): Promise<void> {
   console.log()
 
-  const config  = readConfig()
-  const info    = gatherProjectInfo(cwd())
+  const config     = readConfig()
+  const projectRoot = opts.cwd ?? cwd()
+  const baseInfo   = gatherProjectInfo(projectRoot)
+  const info: ProjectInfo = opts.projectId
+    ? { ...baseInfo, id: opts.projectId }
+    : baseInfo
   const percUrl = config.perceptionUrl ?? 'http://localhost:3001'
   const percKey = config.perceptionKey ?? ''
 
-  const memoryDir = opts.to ?? defaultMemoryDir(cwd())
+  const memoryDir = opts.to ?? defaultMemoryDir(projectRoot)
   const indexPath = memoryIndexPath(memoryDir)
 
   // ── 1. Fetch decisions ──────────────────────────────────────

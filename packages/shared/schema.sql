@@ -1,5 +1,5 @@
 -- RoBrain Database Schema
--- Apache 2.0 — https://github.com/roryplans/robrain
+-- Apache 2.0 — https://github.com/adelinamart/robrain
 -- ─────────────────────────────────────────────────────────────
 -- Run this once against your Postgres instance.
 -- Requires pgvector extension.
@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS context_system.projects (
   mission            TEXT,
   always_on_summary  TEXT,         -- 3-line summary, regenerated after each session
   last_session_at    TIMESTAMPTZ DEFAULT now(),
+  last_synthesis_at  TIMESTAMPTZ, -- last successful Synthesis batch pass (optional)
+  working_directory  TEXT,        -- cwd where `robrain init-project` ran — post-Synthesis export-memory
   created_at         TIMESTAMPTZ DEFAULT now(),
   updated_at         TIMESTAMPTZ DEFAULT now()
 );
@@ -149,17 +151,27 @@ CREATE TABLE IF NOT EXISTS context_system.mem0_facts (
 CREATE INDEX IF NOT EXISTS idx_facts_project ON context_system.mem0_facts(project_id) WHERE active = true;
 
 -- ── Planning blocks — inferred method layer ───────────────────
+-- Populated by OSS **@robrain/synthesis** (compiled_truth, drift_signal, entity) and by
+-- **cloud Planning / Control** for other block_types. Not unused in OSS — Synthesis upserts
+-- rows keyed by (project_id, block_type, topic) with last_refreshed_at for injection surfaces.
 
 CREATE TABLE IF NOT EXISTS context_system.planning_blocks (
-  id          TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::text,
-  project_id  TEXT NOT NULL,
-  block_type  TEXT NOT NULL,
-  content     TEXT NOT NULL,
-  weight      FLOAT NOT NULL DEFAULT 1.0,
-  hit_count   INTEGER NOT NULL DEFAULT 0,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  id                 TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+  project_id         TEXT NOT NULL,
+  block_type         TEXT NOT NULL,
+  topic              TEXT,              -- topic key for Synthesis upserts (e.g. state-management, Redis)
+  content            TEXT NOT NULL,
+  weight             FLOAT NOT NULL DEFAULT 1.0,
+  hit_count          INTEGER NOT NULL DEFAULT 0,
+  last_refreshed_at  TIMESTAMPTZ DEFAULT now(),
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- One compiled row per (project, block_type, topic) when topic is set — avoids duplicate planning_blocks each Synthesis run.
+CREATE UNIQUE INDEX IF NOT EXISTS planning_blocks_unique_topic
+  ON context_system.planning_blocks(project_id, block_type, topic)
+  WHERE topic IS NOT NULL;
 
 -- ── Semantic search function ───────────────────────────────────
 

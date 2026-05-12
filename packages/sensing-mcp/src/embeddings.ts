@@ -5,6 +5,11 @@
 // All providers return a 1536-dim vector (openai) or we
 // zero-pad to 1536 for providers with smaller dims so the
 // pgvector index (set to 1536) always works.
+//
+// Storage backend: pgvector (not Pinecone). Self-hosted OSS keeps
+// embeddings co-located with `decisions` rows so search_decisions()
+// can filter on project_id / invalidated_at in a single query, and
+// users don't need a managed SaaS account to run `pnpm docker:up`.
 // ─────────────────────────────────────────────────────────────
 
 import { config, type EmbeddingProvider } from './config.js'

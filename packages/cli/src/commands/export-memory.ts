@@ -30,7 +30,8 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'fs'
-import { join } from 'path'
+import { join, resolve, sep } from 'path'
+import { homedir }                 from 'os'
 import { cwd }                     from 'process'
 import { readConfig }              from '../lib/config.js'
 import { gatherProjectInfo, type ProjectInfo } from '../lib/project.js'
@@ -38,6 +39,27 @@ import {
   defaultMemoryDir,
   memoryIndexPath,
 } from '../lib/memory-paths.js'
+
+/**
+ * Confine `--to` to the project root or the user's home directory.
+ * Anything else (e.g. /etc, /, /Users/someone-else) is rejected so a typo or
+ * a malicious project record can't direct writes outside the user's space.
+ */
+function confineMemoryDir(to: string, projectRoot: string): string {
+  const resolved = resolve(to)
+  const home = resolve(homedir())
+  const root = resolve(projectRoot)
+  const inside = (parent: string, child: string) =>
+    child === parent || child.startsWith(parent + sep)
+  if (!inside(home, resolved) && !inside(root, resolved)) {
+    console.log()
+    console.log(chalk.red(`  ✗ --to "${to}" resolves outside your home directory and project root.`))
+    console.log(chalk.dim(`    Resolved: ${resolved}`))
+    console.log(chalk.dim(`    Allowed roots: ${home}, ${root}\n`))
+    process.exit(1)
+  }
+  return resolved
+}
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -90,7 +112,9 @@ export async function exportMemoryCommand(opts: ExportOptions): Promise<void> {
   const percUrl = config.perceptionUrl ?? 'http://localhost:3001'
   const percKey = config.perceptionKey ?? ''
 
-  const memoryDir = opts.to ?? defaultMemoryDir(projectRoot)
+  const memoryDir = opts.to
+    ? confineMemoryDir(opts.to, projectRoot)
+    : defaultMemoryDir(projectRoot)
   const indexPath = memoryIndexPath(memoryDir)
 
   // ── 1. Fetch decisions ──────────────────────────────────────

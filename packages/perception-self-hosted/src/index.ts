@@ -19,6 +19,7 @@
 
 import { Hono }              from 'hono'
 import type { Context }      from 'hono'
+import { bodyLimit }         from 'hono/body-limit'
 import { serve }             from '@hono/node-server'
 import Anthropic             from '@anthropic-ai/sdk'
 import pg                    from 'pg'
@@ -32,8 +33,9 @@ const { Pool } = pg
 const config = {
   port:            Number(process.env.PORT ?? 3001),
   apiKey:          process.env.PERCEPTION_API_KEY ?? '',
+  allowUnauth:     process.env.ALLOW_UNAUTHENTICATED === 'true',
   databaseUrl:     requireEnv('DATABASE_URL'),
-  schema:          process.env.DB_SCHEMA ?? 'context_system',
+  schema:          validateSchemaName(process.env.DB_SCHEMA ?? 'context_system'),
   anthropicApiKey: requireEnv('ANTHROPIC_API_KEY'),
   anthropicModel:  process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
   ossMode:         process.env.OSS_MODE === 'true',
@@ -41,12 +43,37 @@ const config = {
   openaiApiKey:    process.env.OPENAI_API_KEY,
   voyageApiKey:    process.env.VOYAGE_API_KEY,
   cohereApiKey:    process.env.COHERE_API_KEY,
+  rateLimitPerMinute: Number(process.env.PERCEPTION_RATE_LIMIT_PER_MINUTE ?? 120),
+  bodyLimitBytes:  Number(process.env.PERCEPTION_BODY_LIMIT_BYTES ?? 1_000_000),
+}
+
+if (!config.apiKey && !config.allowUnauth) {
+  console.error(
+    '[RoBrain Perception OSS] Refusing to start: PERCEPTION_API_KEY is empty.\n' +
+    '  Generate one with `openssl rand -hex 32` and set it in .env, or run\n' +
+    '  `pnpm docker:up` which auto-generates one via scripts/prepare-env.mjs.\n' +
+    '  To intentionally run unauthenticated (NOT recommended), set ALLOW_UNAUTHENTICATED=true.'
+  )
+  process.exit(1)
+}
+if (!config.apiKey && config.allowUnauth) {
+  console.warn('[RoBrain Perception OSS] WARNING: running without auth (ALLOW_UNAUTHENTICATED=true).')
 }
 
 function requireEnv(key: string): string {
   const v = process.env[key]
   if (!v) throw new Error(`Missing env var: ${key}`)
   return v
+}
+
+// Defence-in-depth: schema name is interpolated into SQL text. Reject anything
+// that isn't a plain unquoted identifier so a misconfigured DB_SCHEMA can't
+// break out of the query context.
+function validateSchemaName(name: string): string {
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(name)) {
+    throw new Error(`Invalid DB_SCHEMA "${name}" — must match /^[a-z_][a-z0-9_]{0,62}$/`)
+  }
+  return name
 }
 
 const pool      = new Pool({ connectionString: config.databaseUrl, max: 10 })
@@ -85,6 +112,13 @@ async function jsonIfProjectUnknown(projectId: string, c: Context): Promise<Resp
   return undefined
 }
 
+// ── Body size limit ──────────────────────────────────────────
+// Cap request bodies so a single client can't queue up huge writes.
+app.use('*', bodyLimit({
+  maxSize: config.bodyLimitBytes,
+  onError: (c) => c.json({ error: 'Payload too large', limit: config.bodyLimitBytes }, 413),
+}))
+
 // ── Auth ──────────────────────────────────────────────────────
 app.use('*', async (c, next) => {
   if (config.apiKey) {
@@ -95,6 +129,44 @@ app.use('*', async (c, next) => {
   }
   await next()
 })
+
+// ── Rate limit ───────────────────────────────────────────────
+// Lightweight per-client token bucket (in-memory, per process). Keys on
+// X-Project-Id when present so Sensing instances scoped to different repos
+// don't starve each other; falls back to remote IP. Best-effort — for a
+// hardened multi-tenant deploy use a real proxy.
+const RATE_LIMIT_WINDOW_MS = 60_000
+const rateBuckets = new Map<string, { count: number; resetAt: number }>()
+
+function rateLimitClient(c: Context): string {
+  const projectId = c.req.header('X-Project-Id')
+  if (projectId) return `proj:${projectId}`
+  const fwd = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
+  return `ip:${fwd ?? 'unknown'}`
+}
+
+const writeRateLimit = async (c: Context, next: () => Promise<void>) => {
+  const key = rateLimitClient(c)
+  const now = Date.now()
+  const bucket = rateBuckets.get(key)
+  if (!bucket || bucket.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+  } else {
+    bucket.count += 1
+    if (bucket.count > config.rateLimitPerMinute) {
+      const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))
+      c.header('Retry-After', String(retryAfter))
+      return c.json({ error: 'rate_limited', retry_after_seconds: retryAfter }, 429)
+    }
+  }
+  await next()
+  return
+}
+// Periodically GC stale buckets.
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, b] of rateBuckets) if (b.resetAt <= now) rateBuckets.delete(k)
+}, RATE_LIMIT_WINDOW_MS).unref()
 
 // ── Health ────────────────────────────────────────────────────
 app.get('/health', async (c) => {
@@ -111,33 +183,47 @@ app.get('/health', async (c) => {
 })
 
 // ── POST /signals — receive from Sensing MCP ──────────────────
+// Length bounds keep a single bad actor from poisoning the corpus with
+// huge blobs. They are well above any legitimate session turn.
+const MAX_TURN_TEXT = 200_000          // ≥ ~50K tokens of conversation
+const MAX_DECISION_TEXT = 4_000        // ~600 words
+const MAX_RATIONALE_TEXT = 4_000
+const MAX_OPTION_TEXT = 1_000
+const MAX_REASON_TEXT = 4_000
+const MAX_FILES = 200
+const MAX_FILE_PATH = 1_000
+const MAX_REJECTED = 50
+
 const ExtractedSchema = z.object({
-  decision:   z.string().nullable(),
-  rationale:  z.string().nullable(),
-  rejected:   z.array(z.object({ option: z.string(), reason: z.string() })),
+  decision:   z.string().max(MAX_DECISION_TEXT).nullable(),
+  rationale:  z.string().max(MAX_RATIONALE_TEXT).nullable(),
+  rejected:   z.array(z.object({
+    option: z.string().max(MAX_OPTION_TEXT),
+    reason: z.string().max(MAX_REASON_TEXT),
+  })).max(MAX_REJECTED),
   confidence: z.number(),
 })
 
 const SignalSchema = z.object({
   signal: z.object({
     turn: z.object({
-      session_id:    z.string(),
+      session_id:    z.string().max(200),
       sequence:      z.number(),
-      user_message:  z.string(),
-      claude_reply:  z.string(),
-      files_touched: z.array(z.string()).default([]),
-      timestamp:     z.string(),
+      user_message:  z.string().max(MAX_TURN_TEXT),
+      claude_reply:  z.string().max(MAX_TURN_TEXT),
+      files_touched: z.array(z.string().max(MAX_FILE_PATH)).max(MAX_FILES).default([]),
+      timestamp:     z.string().max(64),
     }),
-    decision_type:        z.string(),
+    decision_type:        z.string().max(100),
     confidence:           z.number(),
-    files_affected:       z.array(z.string()).default([]),
+    files_affected:       z.array(z.string().max(MAX_FILE_PATH)).max(MAX_FILES).default([]),
     scope:                z.enum(['user','local','team','global']).default('team'),
     needs_classification: z.boolean().optional(),
     extracted:            ExtractedSchema.optional(),
   }),
 })
 
-app.post('/signals', async (c) => {
+app.post('/signals', writeRateLimit, async (c) => {
   const projectId = c.req.header('X-Project-Id') ?? 'default'
   const minConf = THRESHOLDS.DECISION_CONFIDENCE_MIN
 
@@ -423,7 +509,7 @@ app.get('/decisions', async (c) => {
 // ── POST /scores — feedback loop from Sensing ─────────────────
 // Scoring computed server-side where we have the decision text.
 
-app.post('/scores', async (c) => {
+app.post('/scores', writeRateLimit, async (c) => {
   const body = await c.req.json<{
     scores: Array<{ session_id: string; sequence: number; injected_memory_ids: string[]; final_score: number }>
   }>()

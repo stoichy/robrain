@@ -14,8 +14,11 @@
     "synthesis:build": "pnpm --filter @robrain/synthesis build",
     "synthesis:run": "pnpm --filter @robrain/synthesis start",
     "synthesis:dry-run": "SYNTHESIS_DRY_RUN=true pnpm --filter @robrain/synthesis start",
-    "docker:up": "docker compose -f docker/docker-compose.yml --env-file .env up -d",
-    "docker:down": "docker compose -f docker/docker-compose.yml --env-file .env down"
+    "prepare-env": "node scripts/prepare-env.mjs",
+    "docker:up": "pnpm prepare-env && docker compose -f docker/docker-compose.yml --env-file .env up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml --env-file .env down",
+    "docker:build": "pnpm prepare-env && docker compose -f docker/docker-compose.yml --env-file .env build perception",
+    "docker:up:build": "pnpm prepare-env && docker compose -f docker/docker-compose.yml --env-file .env up -d --build perception"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

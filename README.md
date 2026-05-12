@@ -423,6 +423,9 @@ Paste the output into Claude Code before your next task.
 | `npx robrain projects list` | List Perception projects with session/decision counts (recover phantom ids) |
 | `npx robrain projects merge <from-id> <to-id>` | Merge one project id into another in the database |
 | `npx robrain review` | Inspect, edit, or delete captured decisions; conflict **“keep”** can persist a **`related_to`** edge when Perception returns a counterpart id so Synthesis stops re-flagging the pair |
+| `npx robrain review --session <id>` | Review a specific session (default: last session) |
+| `npx robrain review --all` | Show all active decisions, not only the last session |
+| `npx robrain review --limit <n>` | Max decisions to fetch (default: **20**) |
 | `npx robrain review --history` | Show full decision lifecycle including superseded decisions |
 | `npx robrain review --approve-all` | Bulk-approve every reviewable decision in the current fetch (no prompts per row) |
 | `npx robrain export-memory` | Export approved decisions into Claude Code auto-memory files; optional **`--cwd`** / **`--project-id`** for non-interactive paths (Synthesis F2) |
@@ -431,12 +434,16 @@ Paste the output into Claude Code before your next task.
 | `npx robrain inject --files "..."` | Get decisions about specific files |
 | `npx robrain inject --copy` | Copy output directly to clipboard |
 | `npx robrain inject --all` | Request up to **100** decisions (server cap): all **unreviewed** without `--query`, or a wider semantic pool with `--query` |
+| `npx robrain inject --limit <n>` | Cap how many decisions are returned (default: **5**) |
 | `npx robrain explain <file>` | Answer "why does this code exist?" for any file |
 | `npx robrain explain <file> --why` | Full rationale + rejected alternatives per decision |
 | `npx robrain explain <file> --copy` | Copy explain output to the clipboard |
 | `npx robrain rule --add "..."` | Add a Planning rule (**Rory Plans cloud** — requires `planningUrl` in config) |
 | `npx robrain rule --list` | List rules from Planning **`GET /facts`** when cloud is configured; OSS-only prints guidance |
+| `npx robrain rule --remove <id>` | Remove a rule by id (cloud Planning API) |
+| `npx robrain rule --type <type>` | When using **`--add`**, set rule type: **`always_include`**, **`always_exclude`**, or **`preference`** (default: **`preference`**) |
 | `npx robrain status` | Auth + Perception/Planning health + **active decision count** for the current project |
+| `npx robrain logout` | Clear locally stored credentials (Rory Plans token / install state) |
 | `pnpm synthesis:run` | **[Synthesis](#synthesis)** — batch job from **robrain repo root** (`pnpm` must resolve `@robrain/synthesis`) |
 | `npx robrain synth` | Same job via CLI: optional **`--dry-run`**, **`--full`**, **`--lookback <n>`**, **`--project <id>`**. Resolves the robrain monorepo from this CLI package unless **`ROBRAIN_REPO`** is set (needed for some global installs). |
 
@@ -693,11 +700,19 @@ If you **pulled new code** but did **not rebuild** the `perception` service, the
 From the **repo root** (same directory as `.env` and `docker/docker-compose.yml`):
 
 ```bash
-docker compose -f docker/docker-compose.yml --env-file .env build perception
+pnpm docker:up:build
+```
+
+That runs **`prepare-env`** and **`docker compose … up -d --build perception`** — rebuilds the Perception image and recreates the container.
+
+To **build only**, then start Perception yourself:
+
+```bash
+pnpm docker:build
 docker compose -f docker/docker-compose.yml --env-file .env up -d perception
 ```
 
-If Docker reused layers and you still see old behavior, force a clean rebuild:
+If Docker reused layers and you still see old behavior, force a clean rebuild (no pnpm shortcut for **`--no-cache`** yet):
 
 ```bash
 docker compose -f docker/docker-compose.yml --env-file .env build --no-cache perception

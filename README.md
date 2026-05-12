@@ -196,6 +196,17 @@ So you can end up with hundreds of rows nobody has read as a single picture: con
 
 **Synthesis is the job that looks at the full table.**
 
+#### Three passes at a glance
+
+Synthesis is a **batch job** that runs **three passes** over the decision corpus. The headline for most teams is the **contradiction scan**: if one row says *“Use Bun as the JS runtime”* (February) and another says *“Migrate back to Node — Bun is missing critical packages”* (May), Synthesis can treat that as a **direct reversal** even though they were captured in separate sessions, possibly by different developers, possibly with almost no overlapping vocabulary. It writes a **`conflicts_with`** edge into the decision graph and flags both for **`robrain review`**.
+
+The other two passes round out corpus-wide analysis:
+
+- **Drift detection** — clusters decisions by topic and surfaces when **stance has moved** without an explicit reversal, e.g. REST → GraphQL spread across four unrelated-looking decisions.
+- **Entity promotion** — recurring proper nouns such as **Stripe** get promoted to first-class **`planning_blocks`** with enough relationship history to answer “what role does this play?” without re-reading every raw row.
+
+The subsections below walk through each pass in the order the job runs them (Pass 1 drift, Pass 2 contradictions, Pass 3 entities).
+
 #### Pass 1 — Where has the team’s position drifted?
 
 Synthesis clusters architectural decisions by **topic area** (state management, auth, database, testing, API design, …), orders each cluster **chronologically**, and asks whether **recent** rows disagree with **earlier** consensus. When drift is real, it surfaces a plain-language signal — e.g. *your stance on state management is changing: earlier decisions committed to Zustand; recent ones move toward Jotai.*
@@ -266,6 +277,32 @@ It uses the **same `DATABASE_URL` / `DB_SCHEMA` / `ANTHROPIC_API_KEY`** as Perce
 | `SYNTHESIS_PASS2_CONCURRENCY` | `4` | Parallel Haiku calls in Pass 2. |
 | `SYNTHESIS_PROJECT_ID` | *(all projects)* | Restrict the run to one `projects.id`. |
 | `SYNTHESIS_EXPORT_MEMORY` | off | When `true`, after **new `compiled_truth`** rows, runs **`robrain export-memory --cwd <stored> --project-id …`** (needs `working_directory` on `projects`, set by **`robrain init-project`**). **`ROBRAIN_REPO`** overrides the monorepo root for that subprocess if needed. |
+
+#### Recommended cron setup
+
+Run Synthesis from the **robrain clone** (so `pnpm` can resolve **`@robrain/synthesis`**). Point **`DATABASE_URL`** (and API keys) at the same Postgres Perception uses — e.g. reuse the repo **`.env`**, or set vars in the cron line / a small wrapper script if you do not want to source `.env` from cron.
+
+**User crontab** (`crontab -e`) — nightly at 02:00:
+
+```bash
+# RoBrain Synthesis — contradiction scan + drift + entities (incremental Pass 2 by default)
+0 2 * * * cd /path/to/robrain && pnpm synthesis:run >> /tmp/robrain-synthesis.log 2>&1
+```
+
+**`npx robrain synth`** works too if the global CLI can resolve the monorepo (**`ROBRAIN_REPO`** / install layout); **`pnpm synthesis:run`** from the clone is the most reliable cron target.
+
+**`/etc/cron.d/`** files need a **sixth field: the user** who runs the job (see `man 5 crontab`):
+
+```cron
+# /etc/cron.d/robrain — nightly Synthesis (replace YOUR_USER and path)
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+0 2 * * * YOUR_USER cd /path/to/robrain && pnpm synthesis:run
+```
+
+Dry-run smoke test: `SYNTHESIS_DRY_RUN=true pnpm synthesis:run` (or **`pnpm synthesis:dry-run`**).
+
+Cron’s default **`PATH`** is minimal — if **`pnpm`** is not found, use an absolute path (from `which pnpm`) or prepend **`PATH=/usr/local/bin:…`** as in the **`/etc/cron.d`** example above.
 
 **Perception (F1):** semantic **`GET /decisions?query=…`** ranks the top vector neighbours with a **`planning_score`** using shared **`SCORING_WEIGHTS`** (semantic + file overlap + recency + `historical_relevance` + **`APPROVAL_STATE`** from `reviewed_at`). **`robrain inject --files`** forwards paths as **`boost_files`** so file overlap participates.
 

@@ -3,6 +3,7 @@
 //
 // Run:     pnpm synthesis:run   (from repo root) or pnpm --filter @robrain/synthesis start
 // Dry-run: pnpm synthesis:dry-run
+// Loads repo-root `.env` (same as CLI) so DATABASE_URL / ANTHROPIC_API_KEY need not be exported manually.
 
 import { spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
@@ -10,9 +11,14 @@ import { fileURLToPath } from 'node:url'
 import Anthropic from '@anthropic-ai/sdk'
 import { jsonrepair } from 'jsonrepair'
 import pg from 'pg'
-import { THRESHOLDS } from '@robrain/shared'
+import { THRESHOLDS, loadEnv } from '@robrain/shared'
 
 const { Pool } = pg
+
+/** Repo root for `.env` (src or dist: …/packages/synthesis/{src|dist} → three levels up). */
+const synthesisDir = dirname(fileURLToPath(import.meta.url))
+const repoRootForCli = (process.env.ROBRAIN_REPO?.trim() || join(synthesisDir, '..', '..', '..'))
+loadEnv(repoRootForCli)
 
 const config = {
   databaseUrl:      requireEnv('DATABASE_URL'),
@@ -30,10 +36,6 @@ const config = {
   projectIdFilter:  process.env.SYNTHESIS_PROJECT_ID?.trim() || null,
   exportMemory:     process.env.SYNTHESIS_EXPORT_MEMORY === 'true',
 }
-
-const synthesisDir = dirname(fileURLToPath(import.meta.url))
-/** Monorepo root (packages/synthesis/{dist|src} → three levels up). Override with ROBRAIN_REPO if needed. */
-const repoRootForCli = (process.env.ROBRAIN_REPO?.trim() || join(synthesisDir, '..', '..', '..'))
 
 function requireEnv(key: string): string {
   const v = process.env[key]

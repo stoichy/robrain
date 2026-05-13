@@ -605,26 +605,31 @@ app.post('/corrections', async (c) => {
   // Approval is exclusive of invalidation/edit; once a user explicitly
   // approves a decision it disappears from the default review feed.
   if (body.approve) {
-    const result = await pool.query(`
+    const result = await pool.query<{ project_id: string }>(`
       UPDATE ${S}.decisions
       SET reviewed_at = now(),
           conflict_flag = false,
           updated_at = now()
       WHERE id = $1
+      RETURNING project_id
     `, [body.decision_id])
     if (!result.rowCount) {
       return c.json(decisionNotFoundJson(body.decision_id), 404)
     }
+    // Approval changes which tier this decision occupies in the always-on
+    // summary, so trigger a regenerate immediately.
+    scheduleRegenerateSummary(result.rows[0]!.project_id)
     return c.json({ accepted: true, action: 'approved' })
   }
 
   if (body.resolved_conflict_keep && !body.invalidate) {
-    const result = await pool.query(`
+    const result = await pool.query<{ project_id: string }>(`
       UPDATE ${S}.decisions
       SET conflict_flag = false,
           reviewed_at = COALESCE(reviewed_at, now()),
           updated_at = now()
       WHERE id = $1
+      RETURNING project_id
     `, [body.decision_id])
     if (!result.rowCount) {
       return c.json(decisionNotFoundJson(body.decision_id), 404)
@@ -638,15 +643,23 @@ app.post('/corrections', async (c) => {
       `, [body.decision_id, body.counterpart_id])
     }
 
+    scheduleRegenerateSummary(result.rows[0]!.project_id)
     return c.json({ accepted: true, action: 'conflict_resolved_kept' })
   }
 
   if (body.invalidate) {
-    await pool.query(`
+    const result = await pool.query<{ project_id: string }>(`
       UPDATE ${S}.decisions
       SET invalidated_at = now(), updated_at = now()
       WHERE id = $1
+      RETURNING project_id
     `, [body.decision_id])
+    if (!result.rowCount) {
+      return c.json(decisionNotFoundJson(body.decision_id), 404)
+    }
+    // Cached always_on_summary still lists this row until regen; without this,
+    // quiet projects could show stale bullets for hours or days.
+    scheduleRegenerateSummary(result.rows[0]!.project_id)
   }
 
   if (body.corrected_decision) {
@@ -683,6 +696,10 @@ app.post('/corrections', async (c) => {
       body.invalidate ? body.decision_id : null,
       JSON.stringify(embedding),
     ])
+
+    // New row enters high_signal / recent_fill; regen again so the summary
+    // includes it (debounce coalesces with invalidate's schedule above).
+    scheduleRegenerateSummary(projectId)
   }
 
   return c.json({ accepted: true })
@@ -776,6 +793,9 @@ app.post('/projects/merge', async (c) => {
     await client.query(`UPDATE ${S}.planning_blocks SET project_id = $1 WHERE project_id = $2`, [to, from])
     await client.query(`DELETE FROM ${S}.projects WHERE id = $1`, [from])
     await client.query('COMMIT')
+    // Every `from`-project decision now belongs to `to`, so its tier
+    // membership in the always-on summary is stale until we regenerate.
+    scheduleRegenerateSummary(to)
     return c.json({ merged: true, from, to })
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
@@ -947,7 +967,7 @@ async function embed(text: string): Promise<number[]> {
 
 const REGENERATE_SUMMARY_DEBOUNCE_MS = 30_000
 
-/** Per-project trailing debounce — coalesces burst writes (e.g. init-project) into one Haiku call per window. */
+/** Per-project trailing debounce — coalesces burst writes (e.g. init-project) into one summary refresh per window. */
 const regenerateSummaryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 function scheduleRegenerateSummary(projectId: string): void {
@@ -965,29 +985,76 @@ function scheduleRegenerateSummary(projectId: string): void {
 }
 
 async function regenerateSummary(projectId: string): Promise<void> {
-  const { rows } = await pool.query(`
-    SELECT d.decision, d.rationale, d.rejected FROM ${S}.decisions d
-    JOIN ${S}.sessions s ON s.id = d.session_id
-    WHERE s.project_id = $1 AND d.invalidated_at IS NULL
-    ORDER BY d.created_at DESC LIMIT 5
+  // Two-tier selection:
+  //  - High-signal (≤15): approved, has rejected alternatives, or scope=global.
+  //    Sticky — never ages out as long as the decision is still active.
+  //  - Recent fill (≤5): most recent active decisions not already in tier 1.
+  //
+  // We emit the ranked bullet list directly. Previously this was Haiku-
+  // compressed to "exactly 3 lines", which silently dropped rejection
+  // context as a project grew. Bullets cost more tokens per session start
+  // but keep every captured decision visible to the agent, and remove the
+  // Anthropic dependency from the always-on summary path.
+  const { rows } = await pool.query<{
+    decision: string
+    rationale: string | null
+    rejected: Array<{ option: string; reason: string }>
+    reviewed_at: Date | null
+    scope: string
+  }>(`
+    WITH high_signal AS (
+      SELECT d.id, d.decision, d.rationale, d.rejected, d.scope,
+             d.reviewed_at, d.created_at, 1 AS tier
+      FROM ${S}.decisions d
+      JOIN ${S}.sessions s ON s.id = d.session_id
+      WHERE s.project_id = $1
+        AND d.invalidated_at IS NULL
+        AND ( d.reviewed_at IS NOT NULL
+           OR jsonb_array_length(d.rejected) > 0
+           OR d.scope = 'global' )
+      ORDER BY
+        (d.reviewed_at IS NOT NULL)::int DESC,
+        (jsonb_array_length(d.rejected) > 0)::int DESC,
+        d.created_at DESC
+      LIMIT 15
+    ),
+    recent_fill AS (
+      SELECT d.id, d.decision, d.rationale, d.rejected, d.scope,
+             d.reviewed_at, d.created_at, 2 AS tier
+      FROM ${S}.decisions d
+      JOIN ${S}.sessions s ON s.id = d.session_id
+      WHERE s.project_id = $1
+        AND d.invalidated_at IS NULL
+        AND d.id NOT IN (SELECT id FROM high_signal)
+      ORDER BY d.created_at DESC
+      LIMIT 5
+    )
+    SELECT decision, rationale, rejected, reviewed_at, scope
+    FROM (
+      SELECT * FROM high_signal
+      UNION ALL
+      SELECT * FROM recent_fill
+    ) merged
+    ORDER BY tier ASC, created_at DESC
   `, [projectId])
+
   if (!rows.length) return
 
-  const list = rows.map((r: { decision: string; rationale: string | null; rejected: Array<{ option: string; reason: string }> }, i: number) => {
-    const vetoes = (r.rejected ?? []).map((rv: { option: string; reason: string }) => `${rv.option} (${rv.reason})`).join(', ')
-    return `${i + 1}. ${r.decision}${r.rationale ? ` — ${r.rationale}` : ''}${vetoes ? ` | Rejected: ${vetoes}` : ''}`
+  const summary = rows.map((r, i) => {
+    const tags: string[] = []
+    if (r.reviewed_at)        tags.push('approved')
+    if (r.scope === 'global') tags.push('global')
+    const tagSuffix = tags.length ? ` [${tags.join(',')}]` : ''
+    const vetoes    = (r.rejected ?? []).map(rv => `${rv.option} (${rv.reason})`).join(', ')
+    const rationale = r.rationale ? ` — ${r.rationale}` : ''
+    const rejected  = vetoes ? ` | Rejected: ${vetoes}` : ''
+    return `${i + 1}. ${r.decision}${rationale}${rejected}${tagSuffix}`
   }).join('\n')
 
-  const resp = await anthropic.messages.create({
-    model: config.anthropicModel, max_tokens: 150,
-    system: 'Summarise project decisions in exactly 3 lines. Format: "Chose X over Y (reason)." Preserve rejected alternatives verbatim.',
-    messages: [{ role: 'user', content: `Summarise:\n${list}` }],
-  })
-  const block   = resp.content[0]
-  const summary = block?.type === 'text' ? block.text.trim() : null
-  if (summary) {
-    await pool.query(`UPDATE ${S}.projects SET always_on_summary=$2, updated_at=now() WHERE id=$1`, [projectId, summary])
-  }
+  await pool.query(
+    `UPDATE ${S}.projects SET always_on_summary=$2, updated_at=now() WHERE id=$1`,
+    [projectId, summary],
+  )
 }
 
 // ── Start ──────────────────────────────────────────────────────

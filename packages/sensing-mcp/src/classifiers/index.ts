@@ -61,26 +61,53 @@ const DECISION_KEYWORDS = [
   'stick with', 'locking in', 'lock in',
 ]
 
-const IMPLICIT_DECISION_PATTERNS = [
-  // Library imports as proxy for implicit decisions
+// User-side affirmation tokens. When a decision keyword fires only in the
+// assistant reply, we require one of these in the user message before
+// treating the turn as a decision — otherwise an assistant suggestion the
+// user silently scrolled past gets captured as a project decision.
+const AFFIRMATION_PATTERNS: RegExp[] = [
+  /\b(yes|yep|yeah|yup|sure)\b/i,
+  /\b(agreed|agree|approved?)\b/i,
+  /\blet['’]s\s+(do|go|use|try|ship|stick|adopt|switch|move|migrate)\b/i,
+  /\b(go|going)\s+with\b/i,
+  /\bsounds\s+good\b/i,
+  /\bdo\s+it\b/i,
+  /\bship\s+it\b/i,
+]
+
+// Imports / installs imply the action was carried out — count regardless
+// of who wrote them.
+const IMPLICIT_ACTION_PATTERNS = [
   /import .+ from ['"][^'"]+['"]/,
   /require\(['"][^'"]+['"]\)/,
-  // Framework switches
   /npm install|pnpm add|yarn add/,
-  // Brief “let’s …” commitments without keyword hits above
-  /\blet['']s\s+(standardize|standardise|use|go with|stick with|adopt)\b/i,
+]
+
+// "let's standardize on X"-style commitments must come from the user,
+// otherwise they're a suggestion, not a decision.
+const IMPLICIT_USER_COMMITMENT_PATTERNS = [
+  /\blet['’]s\s+(standardize|standardise|use|go with|stick with|adopt)\b/i,
 ]
 
 export async function classifyDecision(
   turn: SessionTurn,
   projectId: string,
 ): Promise<DecisionSignal | null> {
-  const text = `${turn.user_message} ${turn.claude_reply}`.toLowerCase()
+  const userText      = turn.user_message.toLowerCase()
+  const assistantText = turn.claude_reply.toLowerCase()
+  const userAffirmed  = AFFIRMATION_PATTERNS.some(p => p.test(turn.user_message))
 
-  // Stage 1 — keyword heuristic
-  const keywordHit = DECISION_KEYWORDS.some(kw => text.includes(kw))
-  const implicitHit = !keywordHit &&
-    IMPLICIT_DECISION_PATTERNS.some(p => p.test(turn.user_message + turn.claude_reply))
+  // Stage 1 — keyword heuristic, user-biased.
+  // Keyword in user_message: fires unconditionally. Keyword only in the
+  // assistant reply: fires only if the user affirmed in the same turn.
+  const keywordInUser      = DECISION_KEYWORDS.some(kw => userText.includes(kw))
+  const keywordInAssistant = !keywordInUser && DECISION_KEYWORDS.some(kw => assistantText.includes(kw))
+  const keywordHit         = keywordInUser || (keywordInAssistant && userAffirmed)
+
+  const implicitHit = !keywordHit && (
+    IMPLICIT_ACTION_PATTERNS.some(p => p.test(`${turn.user_message} ${turn.claude_reply}`)) ||
+    IMPLICIT_USER_COMMITMENT_PATTERNS.some(p => p.test(turn.user_message))
+  )
 
   if (!keywordHit && !implicitHit) {
     // No signal — skip LLM call entirely (~95% of turns)
@@ -116,7 +143,11 @@ A decision includes ANY of the following (not only formal deliberation):
 - Constraints or conventions established for the repo or team (defaults, policies, "from now on")
 - Plans that commit the work to a specific stack, package manager, library, or pattern
 
-NOT a decision: pure questions with no commitment, vague brainstorming with no resolution, or execution-only steps with no stable choice (e.g. "run the tests" with no policy change).
+NOT a decision:
+- pure questions with no commitment
+- vague brainstorming with no resolution
+- execution-only steps with no stable choice (e.g. "run the tests" with no policy change)
+- a proposal made by the ASSISTANT that the user did not explicitly affirm. Look for user-side affirmation ("yes", "agreed", "let's do it", "go with that", "sounds good") or the user proceeding to execute the proposed action. If the assistant suggested something and the user moved on without affirming, do NOT extract.
 
 Fields:
 - "decision": one short imperative sentence stating WHAT was chosen or agreed (max ~20 words). If nothing was committed, null.

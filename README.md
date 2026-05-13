@@ -52,7 +52,7 @@ Bob runs `npx robrain inject --query "state management" --copy` before his next 
 
 > Chose Zustand over Redux (re-render perf issues in cart) — Mar 15, high confidence
 
-Bob pastes that one line into his agent. The agent now knows the team's prior reasoning, surfaces it in the conversation, and Bob's Claude Code session continues from informed context — instead of re-litigating Alice's Cursor decision from scratch.
+The agent now knows the team's prior reasoning, surfaces it in the conversation, and Bob's Claude Code session continues from informed context — instead of re-litigating Alice's Cursor decision from scratch.
 
 **That's the loop.** Alice can make a decision in Cursor on Tuesday and Bob can pick it up in Claude Code on Wednesday. Decisions and their vetoes flow from one developer's session into every other developer's sessions. Captured automatically; surfaced automatically via the always-on summary, with `inject` for focused pull in Free / self-hosted mode (or task-boundary auto-injection in the cloud).
 
@@ -214,30 +214,24 @@ If you get `command not found: robrain`, either use `npx robrain …` or ensure 
 
 #### Cursor-specific setup (most reliable path)
 
-For Cursor users specifically, the most reliable self-hosted path is Cursor Background Agent or Cursor Rules plus self-hosted install:
+`robrain init-project` automatically writes `.cursor/rules/robrain.mdc` with
+`alwaysApply: true`, so Cursor loads the RoBrain session-lifecycle instructions
+every session. No copy-paste step is required.
+
+To verify:
 
 ```bash
-npx robrain install --self-hosted
+cat .cursor/rules/robrain.mdc
 ```
 
-Then add project rules in `.cursorrules` so Cursor consistently calls the Sensing tools:
+**If decisions stop landing:** the rule file is present, but Cursor's agent
+sometimes ignores rule content turn-to-turn. Check the Cursor MCP panel for the
+`robrain-sensing` server status, then see
+[Decisions captured in the editor but `robrain review` shows nothing](#decisions-captured-in-the-editor-but-robrain-review-shows-nothing-silent-401).
 
-```md
-At session start, call sensing_start_session.
-After every response, call sensing_record_turn with the current turn details.
-At session end, call sensing_end_session.
-```
-
-Copy-paste starter `.cursorrules`:
-
-```md
-# RoBrain sensing hooks (Cursor)
-At session start, call sensing_start_session.
-After every response, call sensing_record_turn with the current turn details.
-At session end, call sensing_end_session.
-```
-
-This improves reliability when Cursor does not consistently follow general instructions by default.
+Adding more rules will not fix a compliance gap. That is a Cursor-side behavior
+that Rory Plans cloud layers additional safeguards against (see
+[Free / self-hosted vs Rory Plans cloud](#free--self-hosted-vs-rory-plans-cloud)).
 
 ## Synthesis
 

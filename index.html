@@ -578,13 +578,13 @@
           <p>Chose Zustand over Redux (re-render perf issues in cart) — Mar 15, high confidence</p>
         </blockquote>
         <p>
-          Bob pastes that line into his agent — the Claude Code session continues from informed context instead of
+          The Claude Code session continues from informed context instead of
           re-litigating Alice’s Cursor decision from scratch.
         </p>
         <p>
           <strong>That’s the loop.</strong> Alice can make a decision in Cursor on Tuesday and Bob can pick it up in
           Claude Code on Wednesday. Decisions and vetoes flow from one developer’s session into everyone else’s.
-          Captured automatically; surfaced automatically via the always-on summary, with <code>inject</code> for
+          Captured automatically; <strong>surfaced automatically via the always-on summary</strong>, with <code>inject</code> for
           focused pull in self-hosted mode (or task-boundary auto-injection in the cloud).
         </p>
         <p>
@@ -687,7 +687,7 @@
               </tr>
               <tr>
                 <th scope="row">Warns the agent before it suggests something you ruled out</th>
-                <td>Yes on <strong>Rory Plans</strong> cloud · self-hosted: roadmap (inject + paste today)</td>
+                <td>Yes on <strong>Rory Plans</strong> cloud · self-hosted: (inject + paste for OSS)</td>
                 <td class="muted">No</td>
                 <td class="muted">No</td>
                 <td class="muted">No</td>
@@ -779,14 +779,20 @@ npx robrain init-project</code></pre>
         <p class="code-label">Contradiction scan (manual once, or add to cron)</p>
         <pre><code>npx robrain synth</code></pre>
         <p style="margin-top: 1rem; font-size: 0.95rem">
-          After <code>init-project</code>, Claude Code gets <code>CLAUDE.md</code> hooks for session start / turn /
-          end — capture is automatic. See the README for Cursor rules and editor-specific notes.
+          After <code>init-project</code>, Claude Code gets <code>CLAUDE.md</code> hooks and Cursor gets
+          <code>.cursor/rules/robrain.mdc</code> with <code>alwaysApply: true</code> — capture setup is automatic.
+          See the README for troubleshooting and editor-specific notes.
         </p>
         <div class="cta-row" style="margin-top: 1rem">
           <a class="btn btn-primary" href="https://github.com/adelinamart/robrain">View on GitHub</a>
           <a class="btn btn-ghost" href="./README.md">Full README</a>
         </div>
       </section>
+
+      <p style="margin: 1rem 0 0; text-align: center; color: var(--violet-800)">
+        Get cloud access: register for Rory Plans cloud early access by filling in
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSe9c-7a23MvUEzF_yjxzK4RN_sF1VHiMSpPplRcG9GxEvbPhA/viewform?pli=1">this form</a>.
+      </p>
 
       <footer>
         <a href="./README.md">README.md</a>

@@ -150,11 +150,20 @@ From a fresh clone, copy `.env.example` to `.env`, add your `ANTHROPIC_API_KEY` 
 ```bash
 pnpm install && pnpm build
 pnpm docker:up
+```
+These first three commands run once from the `robrain` clone.
+
+
+```bash
+npm install -g robrain
 npx robrain install --self-hosted --repo-root "$(pwd)"
+```
+These commands install the Robrain package and then set-up everything so Robrain can run. 
+
+```bash
 cd /path/to/your/project && npx robrain init-project
 ```
-
-The first three commands run once from the `robrain` clone. The last command runs once per application repo.
+The last command runs once per application repo.
 
 ### Install details
 

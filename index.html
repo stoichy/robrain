@@ -6,7 +6,7 @@
     <title>RoBrain — open-source shared memory for AI teams</title>
     <meta
       name="description"
-      content="Open-source shared memory for teams using AI agents. Captures decisions and ruled-out alternatives; flags contradictions."
+      content="Shared memory with judgment for AI teams — capture decisions and vetoes, scan the corpus for contradictions, surface what matters before the agent acts."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -502,16 +502,67 @@
         margin-top: 1.75rem;
       }
 
-      .lead-callout {
-        font-size: 1.06rem;
+      .hero-thesis {
+        font-family: "Fraunces", Georgia, serif;
+        font-size: clamp(1.2rem, 3.2vw, 1.6rem);
         font-weight: 600;
-        line-height: 1.55;
+        line-height: 1.45;
         color: var(--violet-950);
-        margin: 0 0 1rem;
-        padding: 1rem 1.15rem;
+        max-width: 40rem;
+        margin: 0.35rem auto 1.35rem;
+        letter-spacing: -0.01em;
+      }
+
+      .pull-quote {
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 1.08rem;
+        font-weight: 600;
+        line-height: 1.5;
+        color: var(--violet-950);
+        margin: 1rem 0;
+        padding: 0.85rem 1rem;
         background: linear-gradient(105deg, var(--violet-100) 0%, rgba(232, 223, 249, 0.35) 55%, transparent 100%);
         border-left: 4px solid var(--violet-600);
         border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      }
+
+      .pull-quote p {
+        margin: 0;
+      }
+
+      .matrix-callout {
+        margin-top: 1rem;
+        padding: 0.9rem 1rem;
+        background: var(--violet-50);
+        border: 1px solid var(--violet-200);
+        border-radius: var(--radius-sm);
+        font-size: 0.98rem;
+        color: var(--violet-900);
+      }
+
+      .compare-matrix td strong {
+        color: var(--violet-950);
+      }
+
+      .cloud-cta {
+        text-align: center;
+      }
+
+      .cloud-cta .cta-row {
+        justify-content: center;
+        margin-top: 1.25rem;
+      }
+
+      details.capture-detail {
+        margin-top: 1rem;
+        font-size: 0.95rem;
+        color: var(--violet-800);
+      }
+
+      details.capture-detail summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--violet-700);
       }
 
       .link-subtle {
@@ -532,98 +583,70 @@
   <body>
     <div class="wrap">
       <header>
-        <span class="badge">Open-source · self-hosted</span>
+        <span class="badge">Open-source · cloud option</span>
         <h1>RoBrain</h1>
-        <p class="lead">Stop watching your AI agent repeat the same mistakes.</p>
-        <p class="sub">
-          <strong>Open-source shared memory</strong> for teams using AI agents. Captures every decision and the
-          alternatives your team ruled out, and flags when a new decision contradicts an old one — so your team
-          revisits past decisions <em>intentionally</em>, instead of re-litigating from zero.
-        </p>
-        <p style="margin: 0.9rem 0 0; color: var(--violet-800)">
-          Built by <a href="https://roryplans.ai">Rory Plans</a>, an agent orchestration platform. RoBrain is the
-          memory layer that keeps multi-agent, multi-developer work coherent over time.
+        <p class="lead">Shared memory across your team and your AI agents — with judgment about what's worth keeping.</p>
+        <p class="hero-thesis">
+          The cost of forgetting a rejection is not just inefficiency — it is the auth bypass you already patched,
+          the migration you already rolled back, the dependency you already removed for a CVE.
         </p>
         <div class="pill-row">
           <span class="pill">Claude Code</span>
           <span class="pill">Cursor</span>
           <span class="pill">Copilot</span>
+          <span class="pill">Codex CLI</span>
         </div>
         <div class="cta-row hero-cta">
           <a class="btn btn-primary" href="https://github.com/adelinamart/robrain">View on GitHub</a>
-          <a class="btn btn-ghost" href="./README.md#how-it-works">How it works (README)</a>
+          <a class="btn btn-ghost" href="./docs/concepts.md#how-it-works">How it works</a>
         </div>
+        <p class="link-subtle" style="margin-top: 1.25rem">
+          Built by <a href="https://roryplans.ai">Rory Plans</a>
+        </p>
       </header>
 
       <section class="card">
         <h2><span class="icon">◇</span> How it works</h2>
+        <h3 class="card-sub">The layer above memory</h3>
         <p>
-          <strong>Session 1 — Tuesday afternoon, Alice in Cursor:</strong> Alice and her agent work on the shopping
-          cart. They consider Redux, but settle on Zustand because Redux was causing re-render issues in the cart
-          component. RoBrain captures it automatically — no notes, no extra commands.
+          Memory answers <em>“what did we decide in March?”</em> Judgment answers whether you are contradicting
+          yourselves, whether stance drifted without anyone noticing, and whether the agent is about to re-litigate a
+          veto. <strong>Synthesis</strong> scans the full corpus; <code>rejected[]</code> is the substrate pre-task
+          warnings run on.
         </p>
-        <pre class="json-block"><code>{
+        <p style="font-size: 0.98rem; color: var(--violet-800)">
+          Coding is the first vertical because reverts and incidents make forgotten rejections measurable. The same
+          architecture applies wherever agents make decisions that outlast a session.
+        </p>
+        <h3 class="card-sub">The loop (Cursor → Claude Code)</h3>
+        <p>
+          <strong>Tuesday, Alice in Cursor:</strong> her agent settles on Zustand over Redux for the cart; RoBrain
+          captures the decision and veto automatically — no notes, no extra commands.
+          <strong>Wednesday, Bob in Claude Code:</strong> a fresh session is about to suggest Redux again; the
+          always-on summary (or <code>npx robrain inject</code>) surfaces Alice’s veto before he re-litigates from
+          scratch.
+        </p>
+        <blockquote class="pull-quote">
+          <p>Chose Zustand over Redux (re-render perf issues in cart) — Mar 15, high confidence</p>
+        </blockquote>
+        <p>
+          That is the cross-tool handoff: capture in one editor, judgment-backed recall in another — automatically at
+          session start, with <code>inject</code> when you want a narrower pull (cloud can automate that at task
+          boundaries).
+        </p>
+        <details class="capture-detail">
+          <summary>Example captured row (JSON)</summary>
+          <pre class="json-block" style="margin-top: 0.75rem"><code>{
   "decision": "Use Zustand for state management",
   "rationale": "Redux caused re-render issues in cart",
   "rejected": [{ "option": "Redux", "reason": "re-render perf issues in cart" }],
   "files_affected": ["src/store/cart.ts"]
 }</code></pre>
-        <p>No notes written. No commands run. The capture is part of the session, not on top of it.</p>
-        <p>
-          <strong>Session 2 — Wednesday morning, Bob opens Claude Code:</strong> Bob’s agent is about to suggest Redux.
-          He runs <code>npx robrain inject --query "state management" --copy</code> before his next prompt. RoBrain
-          returns:
-        </p>
-        <blockquote>
-          <p>Chose Zustand over Redux (re-render perf issues in cart) — Mar 15, high confidence</p>
-        </blockquote>
-        <p>
-          The Claude Code session continues from informed context instead of
-          re-litigating Alice’s Cursor decision from scratch.
-        </p>
-        <p>
-          <strong>That’s the loop.</strong> Alice can make a decision in Cursor on Tuesday and Bob can pick it up in
-          Claude Code on Wednesday. Decisions and vetoes flow from one developer’s session into everyone else’s.
-          Captured automatically; <strong>surfaced automatically via the always-on summary</strong>, with <code>inject</code> for
-          focused pull in self-hosted mode (or task-boundary auto-injection in the cloud).
-        </p>
-        <p>
-          At session start, Sensing fetches a short ranked digest of approved decisions and hands it to the agent — no
-          command, no paste. Bob runs <code>inject</code> here only because he wants a narrower state-management pull
-          than that default block.
-        </p>
-        <h3 class="card-sub">Why this matters</h3>
-        <p>
-          Six months in, every architectural decision — and every alternative you ruled out — is queryable as structured
-          data. New developers inherit the full history. Old decisions stay queryable after you change your mind
-          (<em>“what did we decide in March?”</em> returns a real answer). Contradictions across sessions get flagged
-          for review instead of silently overwriting each other. The cost of forgetting a rejection is not just
-          inefficiency — it is the auth bypass you already patched, the migration you already rolled back, or the
-          dependency you already removed for a CVE.
-        </p>
+        </details>
       </section>
 
-      <div class="grid-2">
-        <div class="mini-card">
-          <h3>Captured</h3>
-          <ul>
-            <li>Architectural decisions made during AI coding sessions</li>
-            <li>Rationale and <strong>rejected alternatives</strong></li>
-            <li>Files in scope, timestamps, confidence</li>
-          </ul>
-        </div>
-        <div class="mini-card">
-          <h3>Not captured</h3>
-          <ul>
-            <li>Your source code or file contents</li>
-            <li>Secrets, passwords, or personal data</li>
-            <li>Anything outside your sessions with the agent</li>
-          </ul>
-        </div>
-      </div>
-
       <section class="card">
-        <h2 id="product-comparison"><span class="icon">⊞</span> How we compare</h2>
+        <h2 id="product-comparison"><span class="icon">⊞</span> What RoBrain does that others don't</h2>
         <p style="margin-bottom: 0.5rem">
           RoBrain next to <strong>Mem0</strong>, <strong>Cloudflare Agent Memory</strong>, and
           <strong>Claude Code Auto-Memory</strong>.
@@ -655,7 +678,7 @@
                 <td>Yes — scheduled scan across the whole project (Synthesis)</td>
                 <td class="muted">No — only at the moment of insertion, no scheduled corpus scan</td>
                 <td class="muted">Partial — internal use only</td>
-                <td>Yes — but silently deletes the loser</td>
+                <td>Yes — <strong>silently deletes the loser</strong></td>
               </tr>
               <tr>
                 <th scope="row">Past decisions stay queryable after you change your mind</th>
@@ -672,7 +695,7 @@
                 <td class="muted">No — per-user, per-machine</td>
               </tr>
               <tr>
-                <th scope="row">Works across Claude Code, Cursor, and Copilot</th>
+                <th scope="row">Works across Claude Code, Cursor, Copilot, and Codex CLI</th>
                 <td>Yes</td>
                 <td>Yes</td>
                 <td>Yes</td>
@@ -687,7 +710,7 @@
               </tr>
               <tr>
                 <th scope="row">Warns the agent before it suggests something you ruled out</th>
-                <td>Yes on <strong>Rory Plans</strong> cloud · self-hosted: (inject + paste for OSS)</td>
+                <td>Cloud: yes, automatic.<br>Self-hosted: yes, via <code>inject</code>.</td>
                 <td class="muted">No</td>
                 <td class="muted">No</td>
                 <td class="muted">No</td>
@@ -695,8 +718,23 @@
             </tbody>
           </table>
         </div>
+        <p class="matrix-callout">
+          <strong>Why structured lifecycle matters:</strong> Claude Code Auto-Memory can flag contradictions — but
+          <strong>silently deletes the loser</strong>. RoBrain keeps both sides queryable so teams revisit reversals
+          intentionally.
+        </p>
         <p class="figure-caption">
-          More detail and tradeoffs: <a href="./README.md#comparisons">README — Comparisons</a>.
+          More detail and tradeoffs: <a href="./docs/concepts.md#comparisons">Concepts — Comparisons</a>.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2><span class="icon">⟲</span> Decisions evolve. RoBrain knows that.</h2>
+        <p>
+          Decisions are <strong>durable context</strong>, not permanent vetoes. When a previously rejected idea makes
+          sense again, you supersede the old row — history stays queryable, the new decision becomes active.
+          <strong>Synthesis</strong> flags contradictions for <code>robrain review</code>; it does not fossilize your
+          stack. Informed reconsideration, not lock-in.
         </p>
       </section>
 
@@ -712,14 +750,11 @@
           </p>
         </div>
         <div class="arch-block">
-          <h3>Team-visible decisions in git (opt-in)</h3>
+          <h3>Team ledger (opt-in)</h3>
           <p>
-            <code>npx robrain export-memory --ledger</code> writes a single regenerated
-            <code>decisions.md</code> in your project (default: repo root). The RoBrain DB stays the source of truth;
-            the file is for PR review and diffs — approved decisions in effect, superseded history, and optionally
-            pending rows with <code>--include-unreviewed</code>. This is separate from per-user Claude auto-memory
-            under <code>~/.claude/projects/&lt;slug&gt;/memory/</code>, which <code>export-memory</code> still
-            updates without <code>--ledger</code>.
+            <code>npx robrain export-memory --ledger</code> regenerates <code>decisions.md</code> for PR review; Postgres
+            stays the source of truth. Separate from per-user Claude auto-memory under
+            <code>~/.claude/projects/&lt;slug&gt;/memory/</code>.
           </p>
         </div>
         <div class="arch-block">
@@ -761,26 +796,43 @@
       </section>
 
       <section class="card">
-        <h2><span class="icon">⟲</span> Decisions evolve. RoBrain knows that.</h2>
-        <p>
-          Decisions in RoBrain aren’t permanent vetoes — they’re <strong>durable context</strong>. When a
-          previously rejected idea makes sense again, you supersede the old row: the history stays queryable, the new
-          decision becomes active. <strong>Synthesis</strong> flags contradictions for human review in
-          <code>robrain review</code> — it doesn’t block the agent from re-suggesting forever. The goal is
-          <strong>informed reconsideration</strong>, not fossilization.
-        </p>
+        <h2><span class="icon">◈</span> What RoBrain sees — and doesn't</h2>
+        <div class="grid-2" style="margin-top: 0.5rem">
+          <div class="mini-card">
+            <h3>Captured</h3>
+            <ul>
+              <li>Architectural decisions made during AI coding sessions</li>
+              <li>Rationale and <strong>rejected alternatives</strong></li>
+              <li>Files in scope, timestamps, confidence</li>
+            </ul>
+          </div>
+          <div class="mini-card">
+            <h3>Not captured</h3>
+            <ul>
+              <li>Your source code or file contents</li>
+              <li>Secrets, passwords, or personal data</li>
+              <li>Anything outside your sessions with the agent</li>
+            </ul>
+          </div>
+        </div>
       </section>
 
       <section class="card">
         <h2><span class="icon">⚡</span> Quick start</h2>
         <p class="final-cta-intro">
-          From a fresh clone: install, bring up the background services, wire your editor, init your app repo, then run
-          a corpus scan when you’re ready.
+          See the payoff first — then install. Self-hosted usually needs <code>ANTHROPIC_API_KEY</code> plus one
+          embedding-provider key.
         </p>
-        <p style="margin: 0.6rem 0 1rem; color: var(--violet-800)">
-          Self-hosted usually needs two keys: <code>ANTHROPIC_API_KEY</code> for extraction and one embedding-provider
-          key for semantic retrieval.
-        </p>
+        <p class="code-label">What you get after capture</p>
+        <pre><code>$ npx robrain explain src/store/cart.ts
+
+  src/store/cart.ts — 3 decisions
+
+  • Chose Zustand over Redux (re-render performance issues in cart) — Mar 15 2024
+  • Chose optimistic updates over server-confirmed writes — Apr 2 2024
+  • Chose normalised shape over nested objects — Apr 18 2024
+
+  Tip: add --why for full rationale and rejected alternatives</code></pre>
         <p class="code-label">One-time — RoBrain repo</p>
         <pre><code>pnpm install && pnpm build
 pnpm docker:up
@@ -796,23 +848,62 @@ npx robrain init-project</code></pre>
         <p style="margin-top: 1rem; font-size: 0.95rem">
           After <code>init-project</code>, every repo gets <code>CLAUDE.md</code> and <code>AGENTS.md</code> (Codex CLI),
           and Cursor also gets <code>.cursor/rules/robrain.mdc</code> with <code>alwaysApply: true</code> — capture setup is automatic.
-          See the README for troubleshooting and editor-specific notes.
+          See
+          <a href="./docs/cli.md">docs/cli.md</a> (install + commands) and
+          <a href="./docs/troubleshooting.md">docs/troubleshooting.md</a> for editor-specific notes.
+          Concept walkthrough: <a href="./docs/concepts.md#how-it-works">docs/concepts.md</a>.
         </p>
         <div class="cta-row" style="margin-top: 1rem">
           <a class="btn btn-primary" href="https://github.com/adelinamart/robrain">View on GitHub</a>
-          <a class="btn btn-ghost" href="./README.md">Full README</a>
+          <a class="btn btn-ghost" href="./docs/cli.md#install-and-setup">Install guide</a>
         </div>
       </section>
 
-      <p style="margin: 1rem 0 0; text-align: center; color: var(--violet-800)">
-        Get cloud access: register for Rory Plans cloud early access by filling in
-        <a href="https://docs.google.com/forms/d/e/1FAIpQLSe9c-7a23MvUEzF_yjxzK4RN_sF1VHiMSpPplRcG9GxEvbPhA/viewform?pli=1">this form</a>.
-      </p>
+      <section class="card cloud-cta">
+        <h2><span class="icon">☁</span> Rory Plans cloud</h2>
+        <p>
+          Self-hosted gives capture, corpus-wide judgment, and the always-on summary at session start. When you need
+          focused context beyond that block, you still pull it with <code>inject</code>. Cloud adds Planning +
+          Control — rejection warnings and conflict surfacing <strong>before the agent acts</strong>, without paste.
+        </p>
+        <div class="cta-row">
+          <a
+            class="btn btn-primary"
+            href="https://docs.google.com/forms/d/e/1FAIpQLSe9c-7a23MvUEzF_yjxzK4RN_sF1VHiMSpPplRcG9GxEvbPhA/viewform?pli=1"
+            >Join early access</a
+          >
+          <a class="btn btn-ghost" href="https://roryplans.ai">roryplans.ai</a>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span class="icon">◎</span> Documentation</h2>
+        <p style="margin-top: 0">
+          Overview: <a href="./README.md">README.md</a>. Deep dives:
+        </p>
+        <ul style="margin: 0.75rem 0 0; padding-left: 1.25rem; color: var(--violet-900)">
+          <li style="margin-bottom: 0.45rem">
+            <a href="./docs/concepts.md">docs/concepts.md</a> — pillars, Synthesis, comparisons
+          </li>
+          <li style="margin-bottom: 0.45rem">
+            <a href="./docs/cli.md">docs/cli.md</a> — install, commands, <code>explain</code>
+          </li>
+          <li>
+            <a href="./docs/troubleshooting.md">docs/troubleshooting.md</a> — 401s, Docker, verification
+          </li>
+        </ul>
+      </section>
 
       <footer>
-        <a href="./README.md">README.md</a>
+        <a href="./README.md">README</a>
         ·
-        <a href="https://github.com/adelinamart/robrain">github.com/adelinamart/robrain</a>
+        <a href="./docs/concepts.md">Concepts</a>
+        ·
+        <a href="./docs/cli.md">CLI</a>
+        ·
+        <a href="./docs/troubleshooting.md">Troubleshooting</a>
+        ·
+        <a href="https://github.com/adelinamart/robrain">GitHub</a>
       </footer>
     </div>
   </body>

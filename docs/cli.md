@@ -2,13 +2,13 @@
 
 Install details, editor setup, and the full command table.
 
-[← Back to README](../README.md)
+[← Back to README](https://github.com/adelinamart/robrain)
 
 ## Install and setup
 
 `pnpm docker:up` brings up Postgres + Perception in the background; the user-facing surfaces are Sensing and the `robrain` CLI. `npx robrain init-project` writes the project instructions that tell each editor's agent to call the Sensing tools at session start and end (`CLAUDE.md`, `AGENTS.md` for Codex, and `.cursor/rules/robrain.mdc` when Cursor is installed).
 
-Self-hosted setup usually needs two keys: **`ANTHROPIC_API_KEY`** for extraction and one embedding-provider key for semantic retrieval. If that surprises you, see [Why are there two API keys in self-hosted mode?](concepts.md#why-are-there-two-api-keys-in-self-hosted-mode).
+Self-hosted setup usually needs two keys: **`ANTHROPIC_API_KEY`** for extraction and one embedding-provider key for semantic retrieval. If that surprises you, see [Why are there two API keys in self-hosted mode?](https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#why-are-there-two-api-keys-in-self-hosted-mode).
 
 #### Prerequisites
 - Docker + Docker Compose
@@ -77,11 +77,11 @@ cat .cursor/rules/robrain.mdc
 **If decisions stop landing:** the rule file is present, but Cursor's agent
 sometimes ignores rule content turn-to-turn. Check the Cursor MCP panel for the
 `robrain-sensing` server status, then see
-[Decisions captured in the editor but `robrain review` shows nothing](troubleshooting.md#decisions-captured-in-the-editor-but-robrain-review-shows-nothing-silent-401).
+[Decisions captured in the editor but `robrain review` shows nothing](https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md#decisions-captured-in-the-editor-but-robrain-review-shows-nothing-silent-401).
 
 Adding more rules will not fix a compliance gap. That is a Cursor-side behavior
 that Rory Plans cloud layers additional safeguards against (see
-[Free / self-hosted vs Rory Plans cloud](concepts.md#free--self-hosted-vs-rory-plans-cloud)).
+[Free / self-hosted vs Rory Plans cloud](https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#free--self-hosted-vs-rory-plans-cloud)).
 
 ### Codex CLI setup
 
@@ -99,7 +99,7 @@ codex mcp list   # optional — confirm robrain-sensing is enabled
 ```
 
 Restart the Codex CLI session after install so it reloads MCP config. If captures
-stop landing, check `PERCEPTION_API_KEY` in the managed block (see [troubleshooting](troubleshooting.md)) and confirm the agent is following the RoBrain section in `AGENTS.md`.
+stop landing, check `PERCEPTION_API_KEY` in the managed block (see [troubleshooting](https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md)) and confirm the agent is following the RoBrain section in `AGENTS.md`.
 
 ## Why does this code exist?
 
@@ -192,6 +192,6 @@ All commands accept `--help` for full flag details. Repo-level `pnpm` scripts li
 | `npx robrain rule --type <type>` | When using **`--add`**, set rule type: **`always_include`**, **`always_exclude`**, or **`preference`** (default: **`preference`**) |
 | `npx robrain status` | Auth + Perception/Planning health + **active decision count** for the current project |
 | `npx robrain logout` | Clear locally stored credentials (Rory Plans token / install state) |
-| `pnpm synthesis:run` | **[Synthesis](concepts.md#synthesis)** — batch job from **robrain repo root** (`pnpm` must resolve `@robrain/synthesis`) |
+| `pnpm synthesis:run` | **[Synthesis](https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#synthesis)** — batch job from **robrain repo root** (`pnpm` must resolve `@robrain/synthesis`) |
 | `npx robrain synth` | Same job via CLI: optional **`--dry-run`**, **`--full`**, **`--lookback <n>`**, **`--project <id>`**. Resolves the robrain monorepo from this CLI package unless **`ROBRAIN_REPO`** is set (needed for some global installs). |
 

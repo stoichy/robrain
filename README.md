@@ -18,7 +18,7 @@ RoBrain is built by [Rory Plans](https://roryplans.ai), an agent orchestration p
 
 **Tuesday — experienced teammate in Cursor:** The team is shipping Perception as a small Hono server. They consider porting to Express so contributors have a familiar stack, but settle on Hono: it runs on Bun and edge runtimes without a rewrite, and the API is already Express-shaped (`app.get`, middleware chain). RoBrain captures the decision and the rejected Express path automatically — no one tags it as “worth remembering.”
 
-**Wednesday — new teammate in Claude Code:** A fresh session has no memory of Tuesday. They ask whether Perception should move to Express — a reasonable question if you only see the repo today. With RoBrain wired in, the agent pulls the prior decision (always-on summary at session start, or `npx robrain inject` for a focused pull) and pushes back with the recorded rationale: deliberate Hono choice, marginal familiarity upside, real cost in locking out edge deploy and churn on a working server. The team does not re-litigate from zero.
+**Wednesday — new teammate in Claude Code:** A fresh session has no memory of Tuesday. They ask whether Perception should move to Express — a reasonable question if you only see the repo today. With RoBrain wired in, the agent pulls the prior decision (<strong><span style="color:#6d4aa3">always-on summary</span></strong> at session start, or `npx robrain inject` for a focused pull) and pushes back with the recorded rationale: deliberate Hono choice, marginal familiarity upside, real cost in locking out edge deploy and churn on a working server. The team does not re-litigate from zero.
 
 That is the handoff RoBrain is built for: **Cursor Tuesday → Claude Code Wednesday**, same Postgres store, same structured vetoes — captured passively, surfaced before the agent steers you down a path you already rejected.
 
@@ -34,7 +34,7 @@ Sensing records session turns; Perception extracts decisions without the agent c
 
 ### Judgment (corpus-wide)
 
-**Synthesis** runs three passes over the full `decisions` table: **drift** (stance moving without an explicit reversal), **contradictions** (pairs of incompatible decisions from different sessions), and **entity promotion** (recurring tools/patterns condensed into `planning_blocks`). Perception flags conflicts at write time; Synthesis catches what reactive capture missed. **`robrain review`** and the always-on summary keep only what you trust.
+**Synthesis** runs three passes over the full `decisions` table: **drift** (stance moving without an explicit reversal), **contradictions** (pairs of incompatible decisions from different sessions), and **entity promotion** (recurring tools/patterns condensed into `planning_blocks`). Perception flags conflicts at write time; Synthesis catches what reactive capture missed. **`robrain review`** and the <strong><span style="color:#6d4aa3">always-on summary</span></strong> keep only what you trust.
 
 That is what “judgment about what's worth keeping” looks like in code — not another grep over chat logs.
 
@@ -60,7 +60,7 @@ Versus **Mem0**, **Cloudflare Agent Memory**, and **Claude Code Auto-Memory**: o
 |---|-------------------|------------------|
 | Capture + `rejected[]` + Synthesis + review | ✓ | ✓ |
 | Data stays on your machine | ✓ | processed remotely |
-| Always-on summary at session start | ✓ | ✓ |
+| <strong><span style="color:#6d4aa3">Always-on summary</span></strong> at session start | ✓ | ✓ |
 | Automatic injection + rejection warnings at task boundaries | — | ✓ |
 
 Self-hosted gives capture, judgment batch jobs, and session-start recall; you pull focused context with `inject` when needed. Cloud adds Planning + Control so vetoes and conflicts surface before the agent acts.

@@ -580,6 +580,11 @@
         margin: 1.15rem 0 0.65rem;
       }
 
+      .always-on-summary {
+        font-weight: 700;
+        color: var(--violet-600);
+      }
+
     </style>
   </head>
   <body>
@@ -625,7 +630,8 @@
         <p>
           An experienced teammate locks in <strong>Hono over Express</strong> for Perception in Cursor; RoBrain captures
           it passively. A new teammate opens Claude Code and asks whether to port to Express — reasonable in a fresh
-          session. The always-on summary (or <code>npx robrain inject</code>) surfaces the prior decision before the team
+          session. The <strong class="always-on-summary">always-on summary</strong> (or
+          <code>npx robrain inject</code>) surfaces the prior decision before the team
           burns churn on a path they already rejected.
         </p>
         <blockquote class="callout">
@@ -652,7 +658,7 @@
         </ul>
         <p style="margin-top: 0.85rem; font-size: 0.95rem">
           If none of these sound familiar, a static <code>CLAUDE.md</code> may be enough for now.
-          <a href="./docs/concepts.md#how-it-works">See the full walkthrough →</a>
+          <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#how-it-works">See the full walkthrough →</a>
         </p>
       </section>
 
@@ -735,7 +741,7 @@
           intentionally.
         </p>
         <p class="figure-caption">
-          More detail and tradeoffs: <a href="./docs/concepts.md#comparisons">Concepts — Comparisons</a>.
+          More detail and tradeoffs: <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#comparisons">Concepts — Comparisons</a>.
         </p>
       </section>
 
@@ -754,7 +760,8 @@
         <div class="arch-block">
           <h3>What you interact with</h3>
           <p>
-            <strong>Sensing MCP</strong> runs quietly inside your editor and fetches the always-on summary at session
+            <strong>Sensing MCP</strong> runs quietly inside your editor and fetches the
+            <strong class="always-on-summary">always-on summary</strong> at session
             start. The <strong>robrain</strong> CLI is the manual surface for review, explain, synth, focused
             <code>inject</code> queries, and <code>export-memory</code> (Claude auto-memory and an optional git
             ledger).
@@ -866,10 +873,10 @@ npx robrain init-project</code></pre>
           After <code>init-project</code>, every repo gets <code>CLAUDE.md</code> and <code>AGENTS.md</code> (Codex CLI),
           and Cursor also gets <code>.cursor/rules/robrain.mdc</code> with <code>alwaysApply: true</code> — capture setup is automatic.
           See
-          <a href="./docs/cli.md">docs/cli.md</a> (install + commands) and
-          <a href="./docs/troubleshooting.md">docs/troubleshooting.md</a> for editor-specific notes.
-          Install details: <a href="./docs/cli.md#install-and-setup">docs/cli.md</a> ·
-          <a href="./docs/concepts.md#how-it-works">Concept walkthrough</a>.
+          <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md">docs/cli.md</a> (install + commands) and
+          <a href="https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md">docs/troubleshooting.md</a> for editor-specific notes.
+          Install details: <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md#install-and-setup">docs/cli.md</a> ·
+          <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#how-it-works">Concept walkthrough</a>.
         </p>
       </section>
 
@@ -880,7 +887,8 @@ npx robrain init-project</code></pre>
       <section class="card cloud-cta">
         <h2><span class="icon">☁</span> Rory Plans cloud</h2>
         <p>
-          Self-hosted gives capture, corpus-wide judgment, and the always-on summary at session start. When you need
+          Self-hosted gives capture, corpus-wide judgment, and the
+          <strong class="always-on-summary">always-on summary</strong> at session start. When you need
           focused context beyond that block, you still pull it with <code>inject</code>.
         </p>
         <p>
@@ -894,24 +902,24 @@ npx robrain init-project</code></pre>
             href="https://docs.google.com/forms/d/e/1FAIpQLSe9c-7a23MvUEzF_yjxzK4RN_sF1VHiMSpPplRcG9GxEvbPhA/viewform?pli=1"
             >Join early access</a
           >
-          <a class="btn btn-ghost" href="./docs/concepts.md#free--self-hosted-vs-rory-plans-cloud">Self-hosted vs cloud</a>
+          <a class="btn btn-ghost" href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#free--self-hosted-vs-rory-plans-cloud">Self-hosted vs cloud</a>
         </div>
       </section>
 
       <section class="card">
         <h2><span class="icon">◎</span> Documentation</h2>
         <p style="margin-top: 0">
-          Overview: <a href="./README.md">README.md</a>. Deep dives:
+          Overview: <a href="https://github.com/adelinamart/robrain">README on GitHub</a>. Deep dives:
         </p>
         <ul style="margin: 0.75rem 0 0; padding-left: 1.25rem; color: var(--violet-900)">
           <li style="margin-bottom: 0.45rem">
-            <a href="./docs/concepts.md">docs/concepts.md</a> — pillars, Synthesis, comparisons
+            <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md">docs/concepts.md</a> — pillars, Synthesis, comparisons
           </li>
           <li style="margin-bottom: 0.45rem">
-            <a href="./docs/cli.md">docs/cli.md</a> — install, commands, <code>explain</code>
+            <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md">docs/cli.md</a> — install, commands, <code>explain</code>
           </li>
           <li>
-            <a href="./docs/troubleshooting.md">docs/troubleshooting.md</a> — 401s, Docker, verification
+            <a href="https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md">docs/troubleshooting.md</a> — 401s, Docker, verification
           </li>
         </ul>
       </section>
@@ -920,11 +928,11 @@ npx robrain init-project</code></pre>
         <p style="margin: 0 0 0.75rem">
           Built by <a href="https://roryplans.ai">Rory Plans</a> · Apache 2.0
         </p>
-        <a href="./docs/concepts.md">Concepts</a>
+        <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md">Concepts</a>
         ·
-        <a href="./docs/cli.md">CLI</a>
+        <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md">CLI</a>
         ·
-        <a href="./docs/troubleshooting.md">Troubleshooting</a>
+        <a href="https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md">Troubleshooting</a>
         ·
         <a href="https://github.com/adelinamart/robrain">GitHub</a>
       </footer>

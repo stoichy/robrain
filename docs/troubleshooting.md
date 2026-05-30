@@ -2,7 +2,7 @@
 
 401 debugging, Docker rebuilds, stale summaries, and verification commands.
 
-[← Back to README](../README.md)
+[← Back to README](https://github.com/adelinamart/robrain)
 
 ## Troubleshooting
 

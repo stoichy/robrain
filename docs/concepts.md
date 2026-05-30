@@ -2,7 +2,7 @@
 
 How RoBrain works, the capture + judgment pillars, Synthesis, comparisons, and reference material.
 
-[← Back to README](../README.md)
+[← Back to README](https://github.com/adelinamart/robrain)
 
 Most agent-memory tools stop at capture — they store what happened and hope you query it later. RoBrain is built around a different question: **what is worth keeping, and what should surface before the agent acts again?** Passive capture records every decision and the alternatives your team ruled out; batch **Synthesis** reads the whole corpus to flag contradictions, drift, and recurring entities that no single session could see.
 
@@ -505,7 +505,7 @@ The alternative — CLAUDE.md maintained manually — has zero false positives b
 
 ### Database schema
 
-**Mid-session DB inspection:** Sensing buffers turns in-process ([`packages/sensing-mcp/src/buffer.ts`](packages/sensing-mcp/src/buffer.ts)) and flushes raw rows to Postgres when `sensing_end_session` runs; decisions are written asynchronously on the classifier path—so seeing **0** `session_turns` while decisions already exist is expected, not a bug.
+**Mid-session DB inspection:** Sensing buffers turns in-process ([`packages/sensing-mcp/src/buffer.ts`](https://github.com/adelinamart/robrain/blob/main/packages/sensing-mcp/src/buffer.ts)) and flushes raw rows to Postgres when `sensing_end_session` runs; decisions are written asynchronously on the classifier path—so seeing **0** `session_turns` while decisions already exist is expected, not a bug.
 
 The `decisions` table is the core of RoBrain. Open source, Apache 2.0.
 
@@ -525,4 +525,4 @@ CREATE TABLE context_system.decisions (
 );
 ```
 
-Full schema in [`packages/shared/schema.sql`](../packages/shared/schema.sql).
+Full schema in [`packages/shared/schema.sql`](https://github.com/adelinamart/robrain/blob/main/packages/shared/schema.sql).

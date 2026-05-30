@@ -335,21 +335,30 @@ Both features run on the `rejected[]` substrate the Free / self-hosted version c
 The self-hosted version already brings decisions back automatically through the always-on summary, and lets you pull extra context manually with `npx robrain inject` when you need something task-specific. The cloud version adds the layer that makes that focused retrieval automatic too — context arrives at task boundaries without you doing anything.
 
 | Feature | Free / self-hosted | Rory Plans cloud |
-|---------|--------------------|-----------------|
+|---------|-------------------|------------------|
 | Passive session capture | ✓ | ✓ |
-| `rejected[]` field | ✓ | ✓ |
-| Decision lifecycle tracking | ✓ | ✓ |
+| `rejected[]` field as structured data | ✓ | ✓ |
+| Decision lifecycle (active / superseded / invalidated) | ✓ | ✓ |
+| Cross-tool MCP — Claude Code, Cursor, Copilot, Codex CLI | ✓ | ✓ |
+| Classifier LLM choice — Anthropic Haiku or OpenAI | ✓ | ✓ |
+| Always-on summary at session start | ✓ | ✓ |
 | `npx robrain review` | ✓ | ✓ |
 | `npx robrain inject` (manual paste) | ✓ | ✓ |
+| `npx robrain explain <file>` | ✓ | ✓ |
+| `npx robrain export-memory` → Claude auto-memory + ledger | ✓ | ✓ |
+| Synthesis — drift, contradictions, entity promotion | ✓ | ✓ |
+| Decision graph (`conflicts_with` / `extends` / `related_to`) | ✓ | ✓ |
 | Self-host on your infrastructure | ✓ | — |
 | Your data stays local | ✓ | processed remotely |
-| Haiku extraction (functional) | ✓ | ✓ |
-| Calibrated extraction (fewer false positives) | — | ✓ |
-| **Automatic injection at task boundaries** | — | ✓ |
-| **Relevance scoring — surfaces what matters now** | — | ✓ |
+| Calibrated extraction prompt (fewer false positives) | — | ✓ |
+| Calibrated 4-way contradiction taxonomy (page-12 model) | — | ✓ |
+| Automatic injection at task boundaries | — | ✓ |
+| Pre-task `rejected[]` warning | — | ✓ |
+| Disengagement protocol (⚠ acknowledgement) | — | ✓ |
+| Full 5-signal relevance scorer | — | ✓ |
+| Conflict auto-resolution + dashboard visualizations | — | ✓ |
+| Team memory — managed multi-user store | — | ✓ |
 | Web dashboard | — | ✓ |
-| Team memory + shared scope | — | ✓ |
-| Conflict auto-resolution | — | ✓ |
 
 The honest difference: self-hosted already gives you capture, storage, and the always-on summary. When you need focused retrieval beyond that default block, you still pull it manually with `npx robrain inject`. The cloud adds the intelligence layer — Planning scores what's relevant to your current task and Control injects it automatically at every task boundary. You stop pasting for task-specific recall. Context just arrives.
 

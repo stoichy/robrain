@@ -4,6 +4,8 @@
 
 [← Back to README](https://github.com/adelinamart/robrain)
 
+**New release?** See **[CLI reference — Upgrading](https://github.com/adelinamart/robrain/blob/main/docs/cli.md#upgrading)** for the full pull → build → `docker:up:build` → reinstall → restart-editor checklist.
+
 ## Troubleshooting
 
 After setup, Sensing runs automatically whenever Claude Code is open. The MCP server is registered in `~/.claude/mcp.json`, so Claude Code starts it automatically on launch. The `CLAUDE.md` instructions tell Claude to call `sensing_start_session` at the beginning of each session and `sensing_record_turn` after every exchange.

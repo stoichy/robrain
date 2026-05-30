@@ -830,12 +830,21 @@
       <section class="card">
         <h2><span class="icon">⚡</span> Quick start</h2>
         <p class="final-cta-intro">
-          Self-hosted needs <code>ANTHROPIC_API_KEY</code> plus one embedding-provider key.
+          First <code>pnpm docker:up</code> auto-creates <code>.env</code> and fills <code>PERCEPTION_API_KEY</code> /
+          <code>POSTGRES_PASSWORD</code>. Perception still needs your LLM + embedding keys before it stays up.
         </p>
         <p class="code-label">One-time — RoBrain repo</p>
-        <pre><code>pnpm install && pnpm build
-pnpm docker:up
+        <pre><code>git clone https://github.com/adelinamart/robrain
+cd robrain
+pnpm install && pnpm build
+pnpm docker:up                 # first run: creates .env; Perception won't start yet
+# open .env, add ANTHROPIC_API_KEY + your embedding key (e.g. OPENAI_API_KEY)
+pnpm docker:up                 # second run: Perception now boots
 npx robrain install --self-hosted --repo-root "$(pwd)"</code></pre>
+        <p style="margin-top: 0.65rem; font-size: 0.95rem">
+          OpenAI-only: set <code>LLM_PROVIDER=openai</code> and <code>OPENAI_API_KEY</code> instead of Anthropic — see
+          <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#prefer-not-to-use-anthropic-run-openai-only">Concepts</a>.
+        </p>
         <p class="code-label">Per application project</p>
         <pre><code>cd /path/to/your/project
 npx robrain init-project</code></pre>
@@ -845,9 +854,14 @@ npx robrain init-project</code></pre>
           Synthesis writes contradiction flags, drift signals, and entity summaries into your DB — review with
           <code>npx robrain review</code>. It does not capture new decisions; it judges what you already have.
         </p>
-        <p class="code-label">Git-committed decision ledger (opt-in, after review)</p>
-        <pre><code>npx robrain export-memory --ledger
+        <p class="code-label">Git-committed decision ledger (opt-in)</p>
+        <pre><code>npx robrain review              # optional — inspect/approve captured decisions in the CLI
+npx robrain export-memory --ledger
 # custom path: npx robrain export-memory --ledger docs/decisions.md</code></pre>
+        <p style="margin-top: 0.65rem; font-size: 0.95rem">
+          Use <code>review</code> when you want to see what is being recorded and approve or reject rows before regenerating
+          <code>decisions.md</code> for git — skip it if you are fine exporting straight from the DB.
+        </p>
         <p style="margin-top: 1rem; font-size: 0.95rem">
           After <code>init-project</code>, every repo gets <code>CLAUDE.md</code> and <code>AGENTS.md</code> (Codex CLI),
           and Cursor also gets <code>.cursor/rules/robrain.mdc</code> with <code>alwaysApply: true</code> — capture setup is automatic.
@@ -855,6 +869,7 @@ npx robrain init-project</code></pre>
           <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md">docs/cli.md</a> (install + commands) and
           <a href="https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md">docs/troubleshooting.md</a> for editor-specific notes.
           Install details: <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md#install-and-setup">docs/cli.md</a> ·
+          <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md#upgrading">Upgrading</a> ·
           <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#how-it-works">Concept walkthrough</a>.
         </p>
       </section>

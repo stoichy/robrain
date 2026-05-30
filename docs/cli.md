@@ -101,6 +101,58 @@ codex mcp list   # optional — confirm robrain-sensing is enabled
 Restart the Codex CLI session after install so it reloads MCP config. If captures
 stop landing, check `PERCEPTION_API_KEY` in the managed block (see [troubleshooting](https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md)) and confirm the agent is following the RoBrain section in `AGENTS.md`.
 
+## Upgrading
+
+When a new RoBrain release is out, update every layer you installed: the **git clone** (CLI + Sensing MCP), the **Perception Docker image**, and **editor MCP configs**. Your Postgres data and repo-root `.env` stay in place — you are not reinstalling from scratch.
+
+Check what you are running: `npx robrain --version` (or the `version` field in the clone’s root `package.json`). Compare with [GitHub — Releases](https://github.com/adelinamart/robrain/releases) or the latest `main` branch.
+
+### Self-hosted from a clone (typical)
+
+From the **robrain repo root** (same directory as `docker/` and `.env`):
+
+```bash
+git pull
+pnpm install && pnpm build
+pnpm docker:up:build
+npx robrain install --self-hosted --repo-root "$(pwd)"
+```
+
+| Step | Why it matters |
+|------|----------------|
+| `git pull` + `pnpm build` | Picks up CLI, Sensing MCP, and shared package changes |
+| `pnpm docker:up:build` | Rebuilds Perception and applies startup DB migrations — **pulling code alone leaves the old container running** |
+| `robrain install --self-hosted` | Refreshes MCP server paths and env in Cursor, Claude Code, Codex, and Copilot |
+| **Fully quit and reopen editors** | Closing a chat does not reload the MCP child process or its environment (`Cmd-Q` on macOS, then reopen) |
+
+Application repos usually **do not** need `init-project` again. Re-run it only if release notes call out changes to `CLAUDE.md`, `AGENTS.md`, or `.cursor/rules/robrain.mdc`.
+
+More detail on stale containers and schema drift: [Troubleshooting — Stale Perception Docker image](https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md#stale-perception-docker-image-migrations--schema-out-of-sync).
+
+### Global CLI (`npm install -g robrain`)
+
+```bash
+npm install -g robrain@latest
+```
+
+That updates the CLI on your PATH only. **Self-hosted Docker still requires the clone steps above** — Perception and `ROBRAIN_REPO` live in the repo, not in the global package.
+
+```bash
+cd /path/to/robrain
+git pull && pnpm install && pnpm build
+pnpm docker:up:build
+npx robrain install --self-hosted --repo-root "$(pwd)"
+```
+
+### Verify after upgrading
+
+```bash
+curl -sf "http://localhost:${PERCEPTION_PORT:-3001}/health"
+npx robrain status
+```
+
+If captures or review behave oddly after an upgrade, see [Troubleshooting](https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md).
+
 ## Why does this code exist?
 
 The judgment layer pays off when you need file-scoped history — decisions plus vetoes, not just “we use Zustand”:

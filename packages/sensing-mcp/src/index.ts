@@ -16,6 +16,14 @@ import { loadEnv, type SessionTurn } from '@robrain/shared'
 // which only acts as a fallback for keys missing from `.env`.
 loadEnv()
 
+// Stdio MCP must stay alive — log and continue rather than exit on stray rejections.
+process.on('unhandledRejection', reason => {
+  console.error('[Sensing] Unhandled rejection (process kept alive):', reason)
+})
+process.on('uncaughtException', err => {
+  console.error('[Sensing] Uncaught exception (process kept alive):', err)
+})
+
 const { streamBuffer } = await import('./buffer.js')
 const {
   classifyDecision,
@@ -155,8 +163,9 @@ server.tool(
     let taskDescription: string | null = null
 
     try {
+      const topicShiftAbort = AbortSignal.timeout(config.topicShiftInlineTimeoutMs)
       const shiftSignal = await withTimeout(
-        classifyTopicShift(turn),
+        classifyTopicShift(turn, topicShiftAbort),
         config.topicShiftInlineTimeoutMs,
         null,
       )
@@ -318,6 +327,10 @@ server.tool(
 // ─────────────────────────────────────────────────────────────
 
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  // Promise.race abandons the loser — attach .catch so a late reject cannot crash the process.
+  promise.catch(err => {
+    console.error('[Sensing] Suppressed late rejection after timeout:', err)
+  })
   return Promise.race([
     promise,
     new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms)),
@@ -336,7 +349,10 @@ async function fetchAlwaysOnSummary(projectId: string): Promise<{
   try {
     const res = await fetch(
       `${config.perceptionApiUrl}/projects/${projectId}/summary`,
-      { headers: { 'Authorization': `Bearer ${config.perceptionApiKey}` } }
+      {
+        headers: { Authorization: `Bearer ${config.perceptionApiKey}` },
+        signal: AbortSignal.timeout(config.fetchTimeoutMs),
+      },
     )
     const raw = await res.text()
     if (!res.ok) {

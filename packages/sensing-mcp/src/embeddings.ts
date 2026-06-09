@@ -20,12 +20,43 @@ const TARGET_DIMS = 1536
 const EMBEDDING_MAX_ATTEMPTS = 5
 const EMBEDDING_BASE_DELAY_MS = 350
 
-async function fetchEmbedding(url: string, init: RequestInit, providerLabel: string): Promise<Response> {
+async function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (!signal) {
+    await new Promise(r => setTimeout(r, ms))
+    return
+  }
+  await new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason ?? new Error('Embedding fetch aborted'))
+      return
+    }
+    const timer = setTimeout(resolve, ms)
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer)
+        reject(signal.reason ?? new Error('Embedding fetch aborted'))
+      },
+      { once: true },
+    )
+  })
+}
+
+async function fetchEmbedding(
+  url: string,
+  init: RequestInit,
+  providerLabel: string,
+  signal?: AbortSignal,
+): Promise<Response> {
   let lastStatus = 0
   let lastStatusText = ''
 
   for (let attempt = 0; attempt < EMBEDDING_MAX_ATTEMPTS; attempt++) {
-    const res = await fetch(url, init)
+    if (signal?.aborted) {
+      throw signal.reason ?? new Error(`${providerLabel} embedding aborted`)
+    }
+
+    const res = await fetch(url, { ...init, signal })
     if (res.ok) return res
 
     lastStatus = res.status
@@ -42,7 +73,7 @@ async function fetchEmbedding(url: string, init: RequestInit, providerLabel: str
     const fromHeader = parseRetryAfterMs(res.headers.get('retry-after'))
     if (fromHeader !== null) delayMs = Math.max(delayMs, fromHeader)
     delayMs += Math.floor(Math.random() * 200)
-    await new Promise(r => setTimeout(r, delayMs))
+    await abortableDelay(delayMs, signal)
   }
 
   throw new Error(
@@ -59,14 +90,14 @@ function parseRetryAfterMs(header: string | null): number | null {
   return null
 }
 
-export async function embed(text: string): Promise<number[]> {
+export async function embed(text: string, signal?: AbortSignal): Promise<number[]> {
   const provider = config.embeddingProvider
   let vec: number[]
 
   switch (provider) {
-    case 'openai':  vec = await embedOpenAI(text);  break
-    case 'voyage':  vec = await embedVoyage(text);  break
-    case 'cohere':  vec = await embedCohere(text);  break
+    case 'openai':  vec = await embedOpenAI(text, signal);  break
+    case 'voyage':  vec = await embedVoyage(text, signal);  break
+    case 'cohere':  vec = await embedCohere(text, signal);  break
     default:
       throw new Error(`Unknown embedding provider: ${provider}`)
   }
@@ -77,7 +108,7 @@ export async function embed(text: string): Promise<number[]> {
 
 // ── OpenAI ────────────────────────────────────────────────────
 
-async function embedOpenAI(text: string): Promise<number[]> {
+async function embedOpenAI(text: string, signal?: AbortSignal): Promise<number[]> {
   if (!config.openaiApiKey) {
     throw new Error('OPENAI_API_KEY is required when EMBEDDING_PROVIDER=openai')
   }
@@ -95,6 +126,7 @@ async function embedOpenAI(text: string): Promise<number[]> {
       }),
     },
     'OpenAI',
+    signal,
   )
   const data = await res.json() as { data: [{ embedding: number[] }] }
   return data.data[0].embedding
@@ -102,7 +134,7 @@ async function embedOpenAI(text: string): Promise<number[]> {
 
 // ── Voyage AI ─────────────────────────────────────────────────
 
-async function embedVoyage(text: string): Promise<number[]> {
+async function embedVoyage(text: string, signal?: AbortSignal): Promise<number[]> {
   if (!config.voyageApiKey) {
     throw new Error('VOYAGE_API_KEY is required when EMBEDDING_PROVIDER=voyage')
   }
@@ -120,6 +152,7 @@ async function embedVoyage(text: string): Promise<number[]> {
       }),
     },
     'Voyage',
+    signal,
   )
   const data = await res.json() as { data: [{ embedding: number[] }] }
   return data.data[0].embedding
@@ -127,7 +160,7 @@ async function embedVoyage(text: string): Promise<number[]> {
 
 // ── Cohere ────────────────────────────────────────────────────
 
-async function embedCohere(text: string): Promise<number[]> {
+async function embedCohere(text: string, signal?: AbortSignal): Promise<number[]> {
   if (!config.cohereApiKey) {
     throw new Error('COHERE_API_KEY is required when EMBEDDING_PROVIDER=cohere')
   }
@@ -147,6 +180,7 @@ async function embedCohere(text: string): Promise<number[]> {
       }),
     },
     'Cohere',
+    signal,
   )
   const data = await res.json() as { embeddings: { float: number[][] } }
   const vec  = data.embeddings.float[0]

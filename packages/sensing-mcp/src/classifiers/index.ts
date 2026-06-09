@@ -249,6 +249,7 @@ const embeddingWindows = new Map<string, number[][]>()
 
 export async function classifyTopicShift(
   turn: SessionTurn,
+  signal?: AbortSignal,
 ): Promise<TopicShiftSignal | null> {
   if (config.topicShiftDisableEmbedding) return null
 
@@ -256,7 +257,7 @@ export async function classifyTopicShift(
   const window = embeddingWindows.get(sessionId) ?? []
 
   // One embeddings API request per sensing_record_turn (user_message only).
-  const currentEmbedding = await embed(turn.user_message)
+  const currentEmbedding = await embed(turn.user_message, signal)
 
   let maxDistance = 0
   let shiftDetected = false

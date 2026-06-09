@@ -60,6 +60,8 @@ export const config = {
   flushGraceWindowMs:    Number(process.env.FLUSH_GRACE_WINDOW_MS    ?? 2000),
   // Max ms to wait inline for topic-shift embedding before returning buffered:true.
   topicShiftInlineTimeoutMs: Number(process.env.TOPIC_SHIFT_INLINE_TIMEOUT_MS ?? 1500),
+  // Per-request timeout for Perception API fetches (always-on summary, etc.).
+  fetchTimeoutMs: Number(process.env.SENSING_FETCH_TIMEOUT_MS ?? 10_000),
   // How many past messages to compare for topic-shift embedding delta.
   topicShiftWindowSize:  Number(process.env.TOPIC_SHIFT_WINDOW_SIZE  ?? 3),
   // When true, skip embedding API calls — topic_shift is never detected via embeddings.

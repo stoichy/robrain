@@ -1,4 +1,9 @@
-# Evidence: Honcho LoCoMo table — accessed 2026-07-07
+# Evidence: Honcho LoCoMo table — accessed 2026-07-07 (historical snapshot)
+
+**Superseded for blog claims as of 2026-07-08.** Mem0 now publishes 92.5
+overall LoCoMo (`mem0-locomo-2026-07-08.md`). For the saturation argument,
+cite Honcho's June 2026 benchmarking post instead of the bare-Haiku-vs-Mem0
+comparison in this table.
 
 Source: https://evals.honcho.dev (301 → https://honcho.dev/evals/)
 The table is rendered client-side; numbers extracted from the page's JS

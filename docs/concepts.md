@@ -481,18 +481,21 @@ Zep is open source (Apache 2.0): [github.com/getzep/zep](https://github.com/getz
 ### Why we don't compete on retrieval benchmarks
 
 The standard way to score memory systems is retrieval accuracy on
-conversational QA benchmarks like LoCoMo. Those numbers are saturating at the
-bare-model level: on Honcho's published LoCoMo table
-([evals.honcho.dev](https://evals.honcho.dev), accessed 2026-07-07,
-re-verified 2026-07-08), a bare,
-no-memory Claude Haiku 4.5 scores 75.6 overall — ahead of Mem0 (66.88) and
-effectively tied with Zep (75.14); Honcho's own system leads at 89.9, and
-credit to them for publishing the bare-model baseline at all. We don't claim
-their numbers are wrong — we cite them because they support a different
-conclusion: when a model with no memory system matches shipping memory
-products on the standard benchmark, that benchmark has stopped telling you
-which system to use. So RoBrain measures something else — whether the agent
-re-proposes an approach the team already rejected
+conversational QA benchmarks like LoCoMo. Vendor scores on that benchmark
+keep rising — Mem0 now publishes **92.5 overall**
+([docs.mem0.ai](https://docs.mem0.ai/core-concepts/memory-evaluation),
+accessed 2026-07-08); Honcho reports **89.9**
+([evals.honcho.dev](https://evals.honcho.dev), accessed 2026-07-08). We cite
+those as vendors' own published numbers, not as independently verified by
+us.
+
+Honcho's June 2026 benchmarking write-up makes a related point: LoCoMo's
+~16k-token conversations "really isn't useful at all in evaluating a memory
+framework" when frontier models ship 200k+ token windows — even though Haiku
+alone still scores 83.9% on LoCoMo in their evaluation
+([Benchmarking Honcho](https://blog.espirai.com/research/Benchmarking-Honcho)).
+So RoBrain measures something else — whether the agent re-proposes an
+approach the team already rejected
 ([VetoBench](https://github.com/adelinamart/robrain/tree/main/packages/vetobench)),
 and whether stored decisions are still true against git history
 (`robrain outcomes`).

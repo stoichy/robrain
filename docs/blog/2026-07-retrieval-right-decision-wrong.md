@@ -196,16 +196,23 @@ is reproducible to the digit on any machine.
 ## What the incumbents' own numbers say
 
 This isn't an argument that existing memory benchmarks are dishonest — it's
-an argument that they're saturated. Honcho's published LoCoMo results make
-the point better than we could ([evals.honcho.dev](https://evals.honcho.dev),
-accessed 2026-07-07, re-verified 2026-07-08): a **bare, no-memory Claude Haiku 4.5 scores 75.6** on
-their overall LoCoMo table — ahead of Mem0 (66.88) and effectively tied with
-Zep (75.14). Honcho's own system leads the table at 89.9, and credit to them
-for publishing the bare-model baseline at all — most vendors don't. But when
-a model with no memory system beats or matches shipping memory products on
-the standard benchmark, the benchmark has stopped discriminating. That's why
-we measure something else: not "did the item come back?" but "did the agent
-repeat the mistake?" and "is the memory still true?"
+an argument that they're less discriminative than they used to be. Recent
+vendor reports put LoCoMo scores above 89: Mem0 publishes **92.5 overall**
+([docs.mem0.ai](https://docs.mem0.ai/core-concepts/memory-evaluation),
+accessed 2026-07-08); Honcho reports **89.9**
+([evals.honcho.dev](https://evals.honcho.dev), accessed 2026-07-08). Those
+are vendors' own numbers — we cite them as published, not as independently
+verified by us.
+
+Honcho makes the saturation point themselves, without leaning on older
+tables: LoCoMo's per-question context (~16k tokens on average) "really isn't
+useful at all in evaluating a memory framework" when frontier models ship
+200k+ token windows — yet Haiku alone still scores 83.9% on LoCoMo in their
+June 2026 write-up
+([Benchmarking Honcho](https://blog.espirai.com/research/Benchmarking-Honcho)).
+That is precisely why we focus on a different question: not "did the memory
+come back?" but "did the agent repeat a decision the team had already
+rejected?" — and whether stored decisions are still true against git.
 
 ## Try it
 

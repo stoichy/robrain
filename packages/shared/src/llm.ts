@@ -125,6 +125,8 @@ export interface AnthropicChatParams {
   system:    string
   user:      string
   maxTokens: number
+  /** Sampling temperature. Unset = API default; pass 0 for reproducibility-sensitive callers (e.g. VetoBench). */
+  temperature?: number
 }
 
 /**
@@ -143,6 +145,7 @@ export async function anthropicChat(params: AnthropicChatParams): Promise<string
     max_tokens: params.maxTokens,
     system:     params.system,
     messages:   [{ role: 'user', content: params.user }],
+    ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
   })
 
   let lastErr = ''

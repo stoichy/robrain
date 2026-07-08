@@ -3,9 +3,11 @@
 // Live-mode agent call. Uses the same provider switch as the rest
 // of the project (@robrain/shared): LLM_PROVIDER=openai routes via
 // openaiChat (honors OPENAI_BASE_URL for fully-local runs),
-// anything else via anthropicChat. Temperature is 0 on the OpenAI
-// path; Anthropic runs at API default — reruns may vary slightly,
-// which is why reports carry the model name and run date.
+// anything else via anthropicChat. Temperature is pinned to 0 on
+// both paths (since 2026-07-08; archived series before that ran
+// the Anthropic path at API default). Ingestion-side extraction
+// in third-party adapters still varies — reports carry the model
+// name and run date.
 // ─────────────────────────────────────────────────────────────
 
 import {
@@ -51,6 +53,7 @@ export async function askAgent(context: string, task: string, opts: AgentOptions
         system: SYSTEM_PROMPT,
         user,
         maxTokens,
+        temperature: 0,
       })
 
   return parseAgentReply(raw)

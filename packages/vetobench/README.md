@@ -211,10 +211,13 @@ undercounted, never overcounted. All judging logic is unit-tested
   (`conventions` → `flatfile`: 10–20% → 0% violations, and `conventions`'
   acknowledgements are inferences without recorded reasons), and retrieval
   quality directly (the offline layer).
-- **Run-to-run variance is real.** The Anthropic path runs at default
-  temperature; across nine runs on 2026-07-07/08 we observed `none` between
-  70% and 90%. Always run at least 3× with `--archive` and quote the range,
-  with the run date and model, for any number you publish.
+- **Run-to-run variance is real.** Across nine runs on 2026-07-07/08 we
+  observed `none` between 70% and 90%. Agent-side temperature is pinned to 0
+  on both providers since 2026-07-08 (the archived series predate the pin on
+  the Anthropic path), but variance never goes away entirely: third-party
+  ingestion re-rolls its own LLM extraction every run, and temperature-0
+  sampling is not bit-exact. Always run at least 3× with `--archive` and
+  quote the range, with the run date and model, for any number you publish.
 - **Synthetic fixtures, authored by the RoBrain team.** The scenarios are
   realistic but chosen by us. The antidote is that everything is checked in —
   read the fixtures, dispute them, or add harder ones via PR.

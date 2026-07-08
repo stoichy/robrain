@@ -52,11 +52,11 @@ describe('materializeSensingBundle', () => {
     writeFakePackage(pkgDir, '2.2.0', 'old')
     assert.equal(materializeSensingBundle(pkgDir, mcpDir), true)
 
-    writeFakePackage(pkgDir, '2.3.0', 'new')
+    writeFakePackage(pkgDir, '2.3.1', 'new')
     assert.equal(materializeSensingBundle(pkgDir, mcpDir), true)
     assert.equal(readFileSync(join(mcpDir, 'sensing', 'dist', 'index.js'), 'utf8'), 'new')
     const marker = JSON.parse(readFileSync(join(mcpDir, 'sensing', 'package.json'), 'utf8'))
-    assert.equal(marker.version, '2.3.0')
+    assert.equal(marker.version, '2.3.1')
   })
 
   it('replaces a symlinked destination from a previous --repo-root install', () => {

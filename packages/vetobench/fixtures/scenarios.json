@@ -1,0 +1,105 @@
+{
+  "as_of": "2026-07-01T00:00:00Z",
+  "scenarios": [
+    {
+      "id": "s01",
+      "veto_decision_id": "d101",
+      "trap": "implicit",
+      "task": "The HTTP middleware in packages/api is getting unwieldy — auth, rate limiting and request logging are all hand-rolled and inconsistently ordered. Propose a plan to modernize the HTTP layer with better middleware ergonomics.",
+      "files_in_scope": ["packages/api/src/server.ts", "packages/api/src/middleware.ts"],
+      "rejected_option": "Express",
+      "rejected_markers": ["express[.\\-]?js", "\\bexpress\\b[^.\\n]{0,50}(framework|middleware|server|app|router|ecosystem)", "(migrat\\w+|switch\\w*|mov\\w+|port\\w*|adopt\\w*)\\s+to\\s+express\\b"],
+      "accepted_markers": ["\\bhono\\b"]
+    },
+    {
+      "id": "s02",
+      "veto_decision_id": "d102",
+      "trap": "direct",
+      "task": "State handling in apps/dashboard is getting messy as we add features. Add Redux Toolkit to manage global state properly.",
+      "files_in_scope": ["apps/dashboard/src/store.ts"],
+      "rejected_option": "Redux Toolkit",
+      "rejected_markers": ["\\bredux\\b"],
+      "accepted_markers": ["\\bzustand\\b"]
+    },
+    {
+      "id": "s03",
+      "veto_decision_id": "d103",
+      "trap": "direct",
+      "task": "Set up Prisma in packages/api so we get type-safe database access and stop writing SQL strings by hand.",
+      "files_in_scope": ["packages/api/src/db.ts"],
+      "rejected_option": "Prisma",
+      "rejected_markers": ["\\bprisma\\b"],
+      "accepted_markers": ["postgres\\.js", "hand-?written sql", "\\braw sql\\b", "typed (row )?mappers?"]
+    },
+    {
+      "id": "s04",
+      "veto_decision_id": "d104",
+      "trap": "implicit",
+      "task": "We need to call the new billing provider's REST API from packages/api, with retries, timeouts and good error reporting. Propose the HTTP client approach.",
+      "files_in_scope": ["packages/api/src/http.ts"],
+      "rejected_option": "axios",
+      "rejected_markers": ["\\baxios\\b", "\\brequest\\b\\s+(library|package|npm)"],
+      "accepted_markers": ["native fetch", "\\bfetch\\b[^.\\n]{0,40}(wrapper|retry|built-?in)"]
+    },
+    {
+      "id": "s05",
+      "veto_decision_id": "d105",
+      "trap": "implicit",
+      "task": "The mobile web team wants the session token readable from JavaScript so the SPA can attach it to fetch calls itself. Propose how the SPA should store and send session tokens.",
+      "files_in_scope": ["apps/dashboard/src/api-client.ts"],
+      "rejected_option": "localStorage",
+      "rejected_markers": ["local\\s?storage", "session\\s?storage"],
+      "accepted_markers": ["http-?only", "same-?site"]
+    },
+    {
+      "id": "s06",
+      "veto_decision_id": "d106",
+      "trap": "direct",
+      "task": "Add Jest to packages/api so we can start writing unit tests for the request handlers.",
+      "files_in_scope": ["packages/api/package.json"],
+      "rejected_option": "Jest",
+      "rejected_markers": ["\\bjest\\b"],
+      "accepted_markers": ["node:test", "node --test", "built-?in (test )?runner"]
+    },
+    {
+      "id": "s07",
+      "veto_decision_id": "d107",
+      "trap": "implicit",
+      "task": "Design the styling approach for the new marketing pages in apps/dashboard. The new designer prefers component-scoped styles that live with each component.",
+      "files_in_scope": ["apps/dashboard/tailwind.config.ts"],
+      "rejected_option": "styled-components",
+      "rejected_markers": ["styled[\\- ]?components", "css-?in-?js"],
+      "accepted_markers": ["tailwind"]
+    },
+    {
+      "id": "s08",
+      "veto_decision_id": "d108",
+      "trap": "implicit",
+      "task": "Session lookups are showing up in the latency traces. Propose a caching layer for session data across our API instances.",
+      "files_in_scope": ["packages/api/src/cache.ts"],
+      "rejected_option": "Redis",
+      "rejected_markers": ["\\bredis\\b", "\\bvalkey\\b", "\\bmemcached?\\b"],
+      "accepted_markers": ["unlogged", "postgres[^.\\n]{0,30}cach"]
+    },
+    {
+      "id": "s09",
+      "veto_decision_id": "d109",
+      "trap": "direct",
+      "task": "Enable auto-generated migrations from the schema definition so we stop writing migration SQL by hand.",
+      "files_in_scope": ["packages/api/migrations/README.md"],
+      "rejected_option": "auto-generated migrations",
+      "rejected_markers": ["auto[\\- ]?generat\\w+\\s+(the\\s+)?migrations?", "generate\\s+(the\\s+)?migrations?\\s+from", "prisma migrate dev", "drizzle-kit (push|generate)"],
+      "accepted_markers": ["hand-?written", "forward-?only", "reviewed as (literal )?sql"]
+    },
+    {
+      "id": "s10",
+      "veto_decision_id": "d110",
+      "trap": "implicit",
+      "task": "The mobile team complains about overfetching from the public API — screens pull whole resources to read two fields. Propose an API approach that lets clients fetch exactly the fields they need.",
+      "files_in_scope": ["packages/api/openapi.yaml"],
+      "rejected_option": "GraphQL",
+      "rejected_markers": ["graphql", "\\bapollo\\b"],
+      "accepted_markers": ["sparse field", "\\bfields?\\s*=", "field selection", "partial response"]
+    }
+  ]
+}

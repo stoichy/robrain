@@ -478,6 +478,25 @@ RoBrain gives structured decision history with vetoes. Zep gives the broader rel
 
 Zep is open source (Apache 2.0): [github.com/getzep/zep](https://github.com/getzep/zep)
 
+### Why we don't compete on retrieval benchmarks
+
+The standard way to score memory systems is retrieval accuracy on
+conversational QA benchmarks like LoCoMo. Those numbers are saturating at the
+bare-model level: on Honcho's published LoCoMo table
+([evals.honcho.dev](https://evals.honcho.dev), accessed 2026-07-07,
+re-verified 2026-07-08), a bare,
+no-memory Claude Haiku 4.5 scores 75.6 overall — ahead of Mem0 (66.88) and
+effectively tied with Zep (75.14); Honcho's own system leads at 89.9, and
+credit to them for publishing the bare-model baseline at all. We don't claim
+their numbers are wrong — we cite them because they support a different
+conclusion: when a model with no memory system matches shipping memory
+products on the standard benchmark, that benchmark has stopped telling you
+which system to use. So RoBrain measures something else — whether the agent
+re-proposes an approach the team already rejected
+([VetoBench](https://github.com/adelinamart/robrain/tree/main/packages/vetobench)),
+and whether stored decisions are still true against git history
+(`robrain outcomes`).
+
 ---
 
 ## What's next

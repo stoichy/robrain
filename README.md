@@ -115,6 +115,14 @@ Versus **Mem0**, **Cloudflare Agent Memory**, and **Claude Code Auto-Memory**: o
 
 Self-hosted gives capture, judgment batch jobs, and session-start recall; you pull focused context with `inject` when needed. Cloud adds Planning + Control so vetoes and conflicts surface before the agent acts. Details: [Concepts — Free / self-hosted vs Rory Plans cloud](docs/concepts.md#free--self-hosted-vs-rory-plans-cloud).
 
+## VetoBench
+
+Memory benchmarks usually ask "did the right item come back?" [VetoBench](packages/vetobench/README.md) asks what that misses: **given a task that invites an approach the team already rejected, does the agent propose it again?**
+
+Across three runs (claude-haiku-4-5, 2026-07-07, quoted as ranges because runs vary): with no memory, the agent re-proposed a rejected approach in **7–8 of 10** tasks (an earlier run the same day hit 9). With vetoes in context, **at most 1 of 10**, and it named the prior rejection every time. A conventions-style file recording only the choices (no vetoes, no reasons — what most teams have today) still let up to 1 through.
+
+The retrieval layer runs offline with no API key and gates CI (`pnpm --filter @robrain/vetobench bench`); the live agent layer uses your existing `.env` keys. Judging is deterministic — no LLM judge — and any memory system can plug in through one adapter interface; a **Mem0 adapter ships in-tree**. In a five-run archived series (every retrieved context saved as a receipt), the recorded rejection was missing from what Mem0 retrieved in **38% of cells** — and violations concentrated exactly there: 26% when the veto was absent vs 3% when present. The agent avoided Express in all five runs but could never say why; where the axios veto was lost, it outright re-proposed axios in 3 of 5 runs. Losing the *why* at ingestion is exactly what a structured `rejected[]` field prevents — and to keep the comparison fair, a five-run **end-to-end series** ran the byte-identical transcripts through RoBrain's own production extractor: **100/100 vetoes survived extraction, 0/50 violations**, receipts committed alongside Mem0's. PRs adding other tools are welcome, including ones that make us look bad. Methodology, honesty caveats, and fixtures: [packages/vetobench/README.md](packages/vetobench/README.md).
+
 ## Security
 
 The memory corpus is guarded by `PERCEPTION_API_KEY` — a random secret in the repo-root `.env` that every client (Sensing MCP, CLI, Synthesis) sends as a Bearer token and Perception verifies on every request except `/health`. It is not issued by any service: `pnpm docker:up` generates one automatically on first run, or set your own (e.g. `openssl rand -hex 32`). `npx robrain install --self-hosted` copies the same value into your editor configs so clients authenticate.

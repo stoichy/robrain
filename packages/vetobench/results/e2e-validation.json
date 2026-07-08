@@ -1,0 +1,687 @@
+{
+  "run_at": "2026-07-08T07:39:46.853Z",
+  "agent_provider": "anthropic",
+  "agent_model": "claude-haiku-4-5-20251001",
+  "adapters": [
+    {
+      "name": "robrain-e2e",
+      "description": "RoBrain full pipeline — production extractor over the same transcripts, then top-5 composite retrieval."
+    }
+  ],
+  "adapter_reports": {
+    "robrain-e2e": {
+      "extraction": [
+        {
+          "id": "d101",
+          "extracted_decision": "Keep the API server on Hono framework for server.ts and middleware.ts.",
+          "extracted_rationale": "Hono's middleware model covers auth, logging and rate limiting with minimal overhead; runs identically on Node and edge runtimes.",
+          "extracted_rejected": [
+            {
+              "option": "Express",
+              "reason": "Larger dependency surface and slower cold starts; migration cost outweighs benefits"
+            },
+            {
+              "option": "Fastify",
+              "reason": "No measured gain over Hono for our workload; migration cost with zero user-visible benefit"
+            }
+          ],
+          "confidence": 0.9,
+          "vetoes_in_fixture": [
+            "Express",
+            "Fastify"
+          ],
+          "vetoes_kept": [
+            "Express",
+            "Fastify"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d102",
+          "extracted_decision": "Use Zustand for client state management in the dashboard.",
+          "extracted_rationale": "Global state surface is small (session, filters, toasts); Zustand covers it in ~50 lines without ceremony.",
+          "extracted_rejected": [
+            {
+              "option": "Redux Toolkit",
+              "reason": "Boilerplate and indirection outweigh benefits at the current state size; team spent more time on slices than features in the spike."
+            },
+            {
+              "option": "MobX",
+              "reason": "Implicit reactivity made renders hard to trace during the spike."
+            }
+          ],
+          "confidence": 0.95,
+          "vetoes_in_fixture": [
+            "Redux Toolkit",
+            "MobX"
+          ],
+          "vetoes_kept": [
+            "Redux Toolkit",
+            "MobX"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d103",
+          "extracted_decision": "Query Postgres with postgres.js driver and hand-written SQL with typed row mappers.",
+          "extracted_rationale": "Direct SQL keeps query plans visible, avoids runtime abstraction layer, and typed mappers live next to queries.",
+          "extracted_rejected": [
+            {
+              "option": "Prisma",
+              "reason": "Query engine adds cold-start latency on serverless deploys and hides generated SQL; both issues hit in 2026-02 spike."
+            },
+            {
+              "option": "TypeORM",
+              "reason": "Decorator-based entities conflict with functional codebase style."
+            }
+          ],
+          "confidence": 0.95,
+          "vetoes_in_fixture": [
+            "Prisma",
+            "TypeORM"
+          ],
+          "vetoes_kept": [
+            "Prisma",
+            "TypeORM"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d104",
+          "extracted_decision": "Use native fetch with a small retry wrapper for outbound HTTP in packages/api/src/http.ts.",
+          "extracted_rationale": "Node 18+ ships fetch; 40-line wrapper provides retries, timeouts, and JSON handling without external dependency.",
+          "extracted_rejected": [
+            {
+              "option": "axios",
+              "reason": "Interceptor chains obscured a double-retry bug in 2026-01; larger and harder to audit."
+            },
+            {
+              "option": "request",
+              "reason": "Deprecated upstream since 2020; unpatched vulnerabilities."
+            }
+          ],
+          "confidence": 0.9,
+          "vetoes_in_fixture": [
+            "axios",
+            "request"
+          ],
+          "vetoes_kept": [
+            "axios",
+            "request"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d105",
+          "extracted_decision": "Store session tokens in httpOnly SameSite=Lax cookies.",
+          "extracted_rationale": "Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.",
+          "extracted_rejected": [
+            {
+              "option": "localStorage",
+              "reason": "XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage"
+            },
+            {
+              "option": "sessionStorage",
+              "reason": "Same XSS exposure as localStorage, plus tokens lost on every new tab"
+            }
+          ],
+          "confidence": 0.95,
+          "vetoes_in_fixture": [
+            "localStorage",
+            "sessionStorage"
+          ],
+          "vetoes_kept": [
+            "localStorage",
+            "sessionStorage"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d106",
+          "extracted_decision": "Use Node.js built-in node:test runner for unit tests.",
+          "extracted_rationale": "Zero test-framework dependencies; node --test runs TypeScript output directly and CI needs no transform config.",
+          "extracted_rejected": [
+            {
+              "option": "Jest",
+              "reason": "ESM support needs transform workarounds; config drift across packages caused two-day delay in 2026-03 attempt"
+            },
+            {
+              "option": "Vitest",
+              "reason": "Capable, but node:test covers needs without another dependency to track"
+            }
+          ],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [
+            "Jest",
+            "Vitest"
+          ],
+          "vetoes_kept": [
+            "Jest",
+            "Vitest"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d107",
+          "extracted_decision": "Style the dashboard with Tailwind utility classes.",
+          "extracted_rationale": "No runtime style computation, works with React Server Components, design tokens in one config.",
+          "extracted_rejected": [
+            {
+              "option": "styled-components",
+              "reason": "Runtime CSS-in-JS incompatible with React Server Components, adds ~12KB to bundle."
+            },
+            {
+              "option": "CSS Modules",
+              "reason": "Splits styling across files; team preferred colocated utilities."
+            }
+          ],
+          "confidence": 0.95,
+          "vetoes_in_fixture": [
+            "styled-components",
+            "CSS Modules"
+          ],
+          "vetoes_kept": [
+            "styled-components",
+            "CSS Modules"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d108",
+          "extracted_decision": "Cache session lookups in a Postgres UNLOGGED table.",
+          "extracted_rationale": "Keeps stack at one datastore; UNLOGGED tables benchmarked within 15% of Redis for session read pattern.",
+          "extracted_rejected": [
+            {
+              "option": "Redis",
+              "reason": "Second datastore adds provisioning, monitoring, backup, and security overhead; ops budget is one datastore until 10x traffic."
+            },
+            {
+              "option": "In-process memory cache",
+              "reason": "Breaks under multiple API instances."
+            },
+            {
+              "option": "Sticky sessions",
+              "reason": "Imposes deploy constraint."
+            }
+          ],
+          "confidence": 0.95,
+          "vetoes_in_fixture": [
+            "Redis",
+            "in-process memory cache"
+          ],
+          "vetoes_kept": [
+            "Redis",
+            "in-process memory cache"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d109",
+          "extracted_decision": "Use hand-written, numbered, forward-only SQL migrations for schema changes.",
+          "extracted_rationale": "Every schema change is reviewed as literal SQL; forward-only keeps prod and CI history linear.",
+          "extracted_rejected": [
+            {
+              "option": "auto-generated migrations",
+              "reason": "Generated diff silently included a column drop that reached staging in 2026-03; generated DDL is no longer trusted for schema changes"
+            },
+            {
+              "option": "down migrations",
+              "reason": "False confidence; most destructive changes cannot actually be reversed; restore-from-backup is the real rollback"
+            }
+          ],
+          "confidence": 0.95,
+          "vetoes_in_fixture": [
+            "auto-generated migrations",
+            "down migrations"
+          ],
+          "vetoes_kept": [
+            "auto-generated migrations",
+            "down migrations"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d110",
+          "extracted_decision": "Maintain public API as REST with OpenAPI specification.",
+          "extracted_rationale": "HTTP caching, straightforward auth, mature tooling across languages; sparse fieldsets address overfetching concerns.",
+          "extracted_rejected": [
+            {
+              "option": "GraphQL",
+              "reason": "Resolver N+1s and cache invalidation complexity outweigh flexibility for ~30-endpoint surface."
+            },
+            {
+              "option": "tRPC",
+              "reason": "Public consumers are not all TypeScript; locks contract to one language ecosystem."
+            }
+          ],
+          "confidence": 0.9,
+          "vetoes_in_fixture": [
+            "GraphQL",
+            "tRPC"
+          ],
+          "vetoes_kept": [
+            "GraphQL",
+            "tRPC"
+          ],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d201",
+          "extracted_decision": "Use pino for structured logging with one JSON line per request in packages/api/src/logger.ts",
+          "extracted_rationale": "Fast, structured, and ops dashboards parse JSON lines natively",
+          "extracted_rejected": [],
+          "confidence": 0.8,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d202",
+          "extracted_decision": "Use GitHub Actions with a single reusable workflow for CI, matrix per package.",
+          "extracted_rationale": "One workflow file reduces complexity; no additional CI vendor lock beyond repo host.",
+          "extracted_rejected": [],
+          "confidence": 0.7,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d203",
+          "extracted_decision": "Use pnpm workspace for the monorepo with workspace protocol for internal packages.",
+          "extracted_rationale": "Strict node_modules layout catches phantom dependencies; workspace protocol keeps internal packages linked.",
+          "extracted_rejected": [],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d204",
+          "extracted_decision": "Implement token-bucket rate limiting at API edge per API key.",
+          "extracted_rationale": "Predictable burst behavior; limits configured per plan tier.",
+          "extracted_rejected": [],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d205",
+          "extracted_decision": "Use problem+json envelope for all API errors following RFC 7807.",
+          "extracted_rationale": "Provides clients with one consistent error shape; internal codes map to documented types.",
+          "extracted_rejected": [],
+          "confidence": 0.7,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d206",
+          "extracted_decision": "Use Docker Compose for local development environment.",
+          "extracted_rationale": "Postgres and API start with one command; parity with deploy image.",
+          "extracted_rejected": [],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d207",
+          "extracted_decision": "Use Prettier for formatting with shared config and ESLint flat config for lint rules",
+          "extracted_rationale": "Formatting is not reviewed; lint rules are; keeping tools separate keeps both fast",
+          "extracted_rejected": [],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d208",
+          "extracted_decision": "Read feature flags from environment variables without a flag service.",
+          "extracted_rationale": "A dozen flags do not justify a flag platform; env vars deploy atomically with the code.",
+          "extracted_rejected": [
+            {
+              "option": "Flag service",
+              "reason": "Unnecessary complexity for a dozen flags"
+            }
+          ],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d209",
+          "extracted_decision": "Export OpenTelemetry traces to collector with 10% sampling rate",
+          "extracted_rationale": "Vendor-neutral instrumentation; sampling keeps ingest costs flat",
+          "extracted_rejected": [],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d210",
+          "extracted_decision": "Store user file uploads in S3-compatible object storage, never in the database.",
+          "extracted_rationale": "Keeps the database small and backups fast; presigned URLs offload transfer.",
+          "extracted_rejected": [
+            {
+              "option": "Store uploads in the database",
+              "reason": "Would bloat database size and slow backups"
+            }
+          ],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d211",
+          "extracted_decision": "Use Zod schemas to validate all API inputs at the boundary.",
+          "extracted_rationale": "One schema per endpoint serves as the OpenAPI source of truth.",
+          "extracted_rejected": [],
+          "confidence": 0.7,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d212",
+          "extracted_decision": "Version API in URL path (/v1); breaking changes bump the version.",
+          "extracted_rationale": "Explicit and cache-friendly; header versioning confused two integration partners in the spike.",
+          "extracted_rejected": [
+            {
+              "option": "Header versioning",
+              "reason": "Confused two integration partners in the spike"
+            }
+          ],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d213",
+          "extracted_decision": "Each package maintains a README with run and test instructions.",
+          "extracted_rationale": "Onboarding documentation lives next to the code it describes.",
+          "extracted_rejected": [],
+          "confidence": 0.7,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        },
+        {
+          "id": "d214",
+          "extracted_decision": "UI strings go through i18n catalog from day one in dashboard app.",
+          "extracted_rationale": "Retrofitting i18n was a six-week project previously; catalog-first is cheaper now.",
+          "extracted_rejected": [],
+          "confidence": 0.85,
+          "vetoes_in_fixture": [],
+          "vetoes_kept": [],
+          "vetoes_dropped": []
+        }
+      ]
+    }
+  },
+  "summary": [
+    {
+      "adapter": "robrain-e2e",
+      "scenarios": 10,
+      "violations": 0,
+      "violationRate": 0,
+      "acknowledgedRate": 1,
+      "byTrap": {
+        "direct": {
+          "scenarios": 4,
+          "violations": 0
+        },
+        "implicit": {
+          "scenarios": 6,
+          "violations": 0
+        }
+      }
+    }
+  ],
+  "cells": [
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s01",
+      "rejected_option": "Express",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Keep the API server on Hono framework for server.ts and middleware.ts. — Hono's middleware model covers auth, logging and rate limiting with minimal overhead; runs identically on Node and edge runtimes.\n  - REJECTED: Express — Larger dependency surface and slower cold starts; migration cost outweighs benefits\n  - REJECTED: Fastify — No measured gain over Hono for our workload; migration cost with zero user-visible benefit\n- Implement token-bucket rate limiting at API edge per API key. — Predictable burst behavior; limits configured per plan tier.\n- Use Zod schemas to validate all API inputs at the boundary. — One schema per endpoint serves as the OpenAPI source of truth.\n- Maintain public API as REST with OpenAPI specification. — HTTP caching, straightforward auth, mature tooling across languages; sparse fieldsets address overfetching concerns.\n  - REJECTED: GraphQL — Resolver N+1s and cache invalidation complexity outweigh flexibility for ~30-endpoint surface.\n  - REJECTED: tRPC — Public consumers are not all TypeScript; locks contract to one language ecosystem.\n- Store session tokens in httpOnly SameSite=Lax cookies. — Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.\n  - REJECTED: localStorage — XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage\n  - REJECTED: sessionStorage — Same XSS exposure as localStorage, plus tokens lost on every new tab",
+      "reply": {
+        "proposal": "Refactor the HTTP middleware stack in packages/api to use Hono's built-in middleware composition model, creating a single ordered chain with auth → rate limiting → logging → handler. Extract token-bucket rate limiting logic into a reusable Hono middleware factory parameterized by plan tier, and use Hono's context object to thread auth state and request IDs through the chain without argument passing. Adopt Hono's middleware error handling to centralize 401/429/500 responses, eliminating try-catch duplication across handlers. This keeps us on our already-chosen Hono framework while making the middleware order explicit, testable, and easier to reason about.",
+        "key_technologies": [
+          "Hono",
+          "Hono middleware composition",
+          "Hono context (c.set/c.get)",
+          "Zod (schema validation in middleware)"
+        ],
+        "acknowledged_rejections": [
+          "Express middleware refactor — already rejected Express framework; migrating middleware would waste effort on a deprecated path",
+          "Custom middleware orchestration framework — unnecessary given Hono's mature composition primitives; adds complexity and maintenance burden",
+          "Async local storage for context propagation — Hono's c context object is cleaner and avoids AlS footguns in edge runtimes"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s01",
+        "adapter": "robrain-e2e",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s02",
+      "rejected_option": "Redux Toolkit",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Use Zustand for client state management in the dashboard. — Global state surface is small (session, filters, toasts); Zustand covers it in ~50 lines without ceremony.\n  - REJECTED: Redux Toolkit — Boilerplate and indirection outweigh benefits at the current state size; team spent more time on slices than features in the spike.\n  - REJECTED: MobX — Implicit reactivity made renders hard to trace during the spike.\n- Maintain public API as REST with OpenAPI specification. — HTTP caching, straightforward auth, mature tooling across languages; sparse fieldsets address overfetching concerns.\n  - REJECTED: GraphQL — Resolver N+1s and cache invalidation complexity outweigh flexibility for ~30-endpoint surface.\n  - REJECTED: tRPC — Public consumers are not all TypeScript; locks contract to one language ecosystem.\n- Use hand-written, numbered, forward-only SQL migrations for schema changes. — Every schema change is reviewed as literal SQL; forward-only keeps prod and CI history linear.\n  - REJECTED: auto-generated migrations — Generated diff silently included a column drop that reached staging in 2026-03; generated DDL is no longer trusted for schema changes\n  - REJECTED: down migrations — False confidence; most destructive changes cannot actually be reversed; restore-from-backup is the real rollback\n- Store session tokens in httpOnly SameSite=Lax cookies. — Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.\n  - REJECTED: localStorage — XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage\n  - REJECTED: sessionStorage — Same XSS exposure as localStorage, plus tokens lost on every new tab\n- Use Node.js built-in node:test runner for unit tests. — Zero test-framework dependencies; node --test runs TypeScript output directly and CI needs no transform config.\n  - REJECTED: Jest — ESM support needs transform workarounds; config drift across packages caused two-day delay in 2026-03 attempt\n  - REJECTED: Vitest — Capable, but node:test covers needs without another dependency to track",
+      "reply": {
+        "proposal": "We should not add Redux Toolkit. Our prior spike showed that Zustand handles our small global state surface (session, filters, toasts) in ~50 lines without Redux's boilerplate and indirection. The messiness is likely a code organization issue rather than a state management one—we should refactor Zustand stores into separate logical modules, add clear action creators as functions, and document the state shape. If specific patterns are unclear, we can add helpers or middleware to Zustand instead of switching frameworks, which would preserve the simplicity that has served us well.",
+        "key_technologies": [
+          "Zustand"
+        ],
+        "acknowledged_rejections": [
+          "Redux Toolkit — Boilerplate and indirection outweigh benefits at current state size; team spent more time on slices than features in the spike"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s02",
+        "adapter": "robrain-e2e",
+        "trap": "direct",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s03",
+      "rejected_option": "Prisma",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Query Postgres with postgres.js driver and hand-written SQL with typed row mappers. — Direct SQL keeps query plans visible, avoids runtime abstraction layer, and typed mappers live next to queries.\n  - REJECTED: Prisma — Query engine adds cold-start latency on serverless deploys and hides generated SQL; both issues hit in 2026-02 spike.\n  - REJECTED: TypeORM — Decorator-based entities conflict with functional codebase style.\n- Maintain public API as REST with OpenAPI specification. — HTTP caching, straightforward auth, mature tooling across languages; sparse fieldsets address overfetching concerns.\n  - REJECTED: GraphQL — Resolver N+1s and cache invalidation complexity outweigh flexibility for ~30-endpoint surface.\n  - REJECTED: tRPC — Public consumers are not all TypeScript; locks contract to one language ecosystem.\n- UI strings go through i18n catalog from day one in dashboard app. — Retrofitting i18n was a six-week project previously; catalog-first is cheaper now.\n- Store session tokens in httpOnly SameSite=Lax cookies. — Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.\n  - REJECTED: localStorage — XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage\n  - REJECTED: sessionStorage — Same XSS exposure as localStorage, plus tokens lost on every new tab\n- Export OpenTelemetry traces to collector with 10% sampling rate — Vendor-neutral instrumentation; sampling keeps ingest costs flat",
+      "reply": {
+        "proposal": "We should not adopt Prisma for this project. Our team explicitly rejected it in 2026-02 after a serverless cold-start latency spike caused by Prisma's query engine initialization, and we chose postgres.js with hand-written SQL and typed row mappers as the better fit for our deployment model. Prisma's abstraction layer hides the generated SQL that we need visible for query plan optimization. Instead, we should continue strengthening our current postgres.js approach by investing in shared typed mapper utilities and SQL template tag helpers that give us type safety without the cold-start overhead.",
+        "key_technologies": [],
+        "acknowledged_rejections": [
+          "Prisma — query engine adds cold-start latency on serverless deploys and hides generated SQL"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s03",
+        "adapter": "robrain-e2e",
+        "trap": "direct",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s04",
+      "rejected_option": "axios",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Use native fetch with a small retry wrapper for outbound HTTP in packages/api/src/http.ts. — Node 18+ ships fetch; 40-line wrapper provides retries, timeouts, and JSON handling without external dependency.\n  - REJECTED: axios — Interceptor chains obscured a double-retry bug in 2026-01; larger and harder to audit.\n  - REJECTED: request — Deprecated upstream since 2020; unpatched vulnerabilities.\n- Maintain public API as REST with OpenAPI specification. — HTTP caching, straightforward auth, mature tooling across languages; sparse fieldsets address overfetching concerns.\n  - REJECTED: GraphQL — Resolver N+1s and cache invalidation complexity outweigh flexibility for ~30-endpoint surface.\n  - REJECTED: tRPC — Public consumers are not all TypeScript; locks contract to one language ecosystem.\n- Store session tokens in httpOnly SameSite=Lax cookies. — Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.\n  - REJECTED: localStorage — XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage\n  - REJECTED: sessionStorage — Same XSS exposure as localStorage, plus tokens lost on every new tab\n- Use Zod schemas to validate all API inputs at the boundary. — One schema per endpoint serves as the OpenAPI source of truth.\n- Use pnpm workspace for the monorepo with workspace protocol for internal packages. — Strict node_modules layout catches phantom dependencies; workspace protocol keeps internal packages linked.",
+      "reply": {
+        "proposal": "Extend the existing native fetch retry wrapper in packages/api/src/http.ts to handle the billing provider's REST API calls. The wrapper already provides retries, timeouts, and JSON handling; we'll add structured error reporting that captures HTTP status, response body, and retry attempts for observability. This leverages our established pattern, avoids introducing a new HTTP dependency, and keeps the codebase auditable. We'll create a typed client function specific to the billing provider that wraps the retry handler and maps provider errors to our internal error types.",
+        "key_technologies": [
+          "native fetch (Node 18+)",
+          "existing retry wrapper in packages/api/src/http.ts",
+          "Zod (for billing provider response validation)"
+        ],
+        "acknowledged_rejections": [
+          "axios — team rejected in prior decision due to interceptor complexity and audit concerns",
+          "request — deprecated upstream with unpatched vulnerabilities",
+          "got or other new HTTP libraries — would duplicate the retry/timeout functionality already in our wrapper and increase dependency surface"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s04",
+        "adapter": "robrain-e2e",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s05",
+      "rejected_option": "localStorage",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Store session tokens in httpOnly SameSite=Lax cookies. — Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.\n  - REJECTED: localStorage — XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage\n  - REJECTED: sessionStorage — Same XSS exposure as localStorage, plus tokens lost on every new tab\n- Cache session lookups in a Postgres UNLOGGED table. — Keeps stack at one datastore; UNLOGGED tables benchmarked within 15% of Redis for session read pattern.\n  - REJECTED: Redis — Second datastore adds provisioning, monitoring, backup, and security overhead; ops budget is one datastore until 10x traffic.\n  - REJECTED: In-process memory cache — Breaks under multiple API instances.\n  - REJECTED: Sticky sessions — Imposes deploy constraint.\n- Use Zustand for client state management in the dashboard. — Global state surface is small (session, filters, toasts); Zustand covers it in ~50 lines without ceremony.\n  - REJECTED: Redux Toolkit — Boilerplate and indirection outweigh benefits at the current state size; team spent more time on slices than features in the spike.\n  - REJECTED: MobX — Implicit reactivity made renders hard to trace during the spike.\n- UI strings go through i18n catalog from day one in dashboard app. — Retrofitting i18n was a six-week project previously; catalog-first is cheaper now.\n- Store user file uploads in S3-compatible object storage, never in the database. — Keeps the database small and backups fast; presigned URLs offload transfer.\n  - REJECTED: Store uploads in the database — Would bloat database size and slow backups",
+      "reply": {
+        "proposal": "Keep session tokens in httpOnly SameSite=Lax cookies and have the browser attach them automatically to all same-origin fetch calls via the `credentials: 'include'` option. The SPA never reads or manually constructs the Authorization header—the browser's cookie mechanism handles attachment transparently. This preserves the XSS protection from the prior decision while working identically on mobile web. If the backend needs the token available to JavaScript for some specific workflow, that indicates a design problem; the correct fix is to change the backend expectation, not expose the token to script.",
+        "key_technologies": [
+          "httpOnly SameSite=Lax cookies",
+          "fetch API with credentials: 'include'",
+          "same-origin cookie attachment"
+        ],
+        "acknowledged_rejections": [
+          "Making tokens readable via JavaScript (document.cookie or custom headers) — Defeats the XSS mitigation from the 2026-04 pentest; analytics snippet compromise would exfiltrate tokens again",
+          "Storing tokens in localStorage or sessionStorage — Known XSS exfiltration vector demonstrated in prior pentest",
+          "Custom token-attachment logic in the SPA — Unnecessary ceremony when the browser does this for free via credentials: 'include'"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s05",
+        "adapter": "robrain-e2e",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s06",
+      "rejected_option": "Jest",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Use Node.js built-in node:test runner for unit tests. — Zero test-framework dependencies; node --test runs TypeScript output directly and CI needs no transform config.\n  - REJECTED: Jest — ESM support needs transform workarounds; config drift across packages caused two-day delay in 2026-03 attempt\n  - REJECTED: Vitest — Capable, but node:test covers needs without another dependency to track\n- Maintain public API as REST with OpenAPI specification. — HTTP caching, straightforward auth, mature tooling across languages; sparse fieldsets address overfetching concerns.\n  - REJECTED: GraphQL — Resolver N+1s and cache invalidation complexity outweigh flexibility for ~30-endpoint surface.\n  - REJECTED: tRPC — Public consumers are not all TypeScript; locks contract to one language ecosystem.\n- Store session tokens in httpOnly SameSite=Lax cookies. — Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.\n  - REJECTED: localStorage — XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage\n  - REJECTED: sessionStorage — Same XSS exposure as localStorage, plus tokens lost on every new tab\n- Cache session lookups in a Postgres UNLOGGED table. — Keeps stack at one datastore; UNLOGGED tables benchmarked within 15% of Redis for session read pattern.\n  - REJECTED: Redis — Second datastore adds provisioning, monitoring, backup, and security overhead; ops budget is one datastore until 10x traffic.\n  - REJECTED: In-process memory cache — Breaks under multiple API instances.\n  - REJECTED: Sticky sessions — Imposes deploy constraint.\n- Use Zod schemas to validate all API inputs at the boundary. — One schema per endpoint serves as the OpenAPI source of truth.",
+      "reply": {
+        "proposal": "Do not add Jest. The team has already committed to node:test as the standard test runner across all packages, and a prior Jest adoption attempt in 2026-03 resulted in a two-day delay due to ESM transform workarounds and config drift. We should instead write unit tests for request handlers using node:test in packages/api, following the existing pattern. If there are specific Jest features blocking handler tests (mocking, fixtures, or matchers), we can evaluate lightweight, focused alternatives that integrate with node:test rather than replacing it.",
+        "key_technologies": [],
+        "acknowledged_rejections": [
+          "Jest — ESM support requires transform workarounds; config drift across packages caused documented two-day delay in 2026-03; node:test is the team standard"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s06",
+        "adapter": "robrain-e2e",
+        "trap": "direct",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s07",
+      "rejected_option": "styled-components",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Style the dashboard with Tailwind utility classes. — No runtime style computation, works with React Server Components, design tokens in one config.\n  - REJECTED: styled-components — Runtime CSS-in-JS incompatible with React Server Components, adds ~12KB to bundle.\n  - REJECTED: CSS Modules — Splits styling across files; team preferred colocated utilities.\n- Cache session lookups in a Postgres UNLOGGED table. — Keeps stack at one datastore; UNLOGGED tables benchmarked within 15% of Redis for session read pattern.\n  - REJECTED: Redis — Second datastore adds provisioning, monitoring, backup, and security overhead; ops budget is one datastore until 10x traffic.\n  - REJECTED: In-process memory cache — Breaks under multiple API instances.\n  - REJECTED: Sticky sessions — Imposes deploy constraint.\n- UI strings go through i18n catalog from day one in dashboard app. — Retrofitting i18n was a six-week project previously; catalog-first is cheaper now.\n- Store user file uploads in S3-compatible object storage, never in the database. — Keeps the database small and backups fast; presigned URLs offload transfer.\n  - REJECTED: Store uploads in the database — Would bloat database size and slow backups\n- Store session tokens in httpOnly SameSite=Lax cookies. — Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.\n  - REJECTED: localStorage — XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage\n  - REJECTED: sessionStorage — Same XSS exposure as localStorage, plus tokens lost on every new tab",
+      "reply": {
+        "proposal": "Use Tailwind utility classes with component-level organization in the marketing pages, colocating class definitions within each component file while maintaining consistency through our shared Tailwind config. Create a reusable component library (e.g., in a `components/` folder) where marketing-specific components like `HeroSection`, `FeatureCard`, and `CTAButton` encapsulate their Tailwind utilities, giving the appearance of scoped styling without runtime overhead. Document shared design tokens (colors, spacing, typography) in the Tailwind config and reference them consistently across components so the designer sees logical grouping without splitting styling logic across separate CSS files.",
+        "key_technologies": [
+          "Tailwind CSS",
+          "React Server Components",
+          "JavaScript/TypeScript component files"
+        ],
+        "acknowledged_rejections": [
+          "styled-components — Runtime CSS-in-JS incompatible with React Server Components and adds bundle bloat",
+          "CSS Modules — Splits styling away from components; team standardized on colocated utility approach"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s07",
+        "adapter": "robrain-e2e",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s08",
+      "rejected_option": "Redis",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Cache session lookups in a Postgres UNLOGGED table. — Keeps stack at one datastore; UNLOGGED tables benchmarked within 15% of Redis for session read pattern.\n  - REJECTED: Redis — Second datastore adds provisioning, monitoring, backup, and security overhead; ops budget is one datastore until 10x traffic.\n  - REJECTED: In-process memory cache — Breaks under multiple API instances.\n  - REJECTED: Sticky sessions — Imposes deploy constraint.\n- Maintain public API as REST with OpenAPI specification. — HTTP caching, straightforward auth, mature tooling across languages; sparse fieldsets address overfetching concerns.\n  - REJECTED: GraphQL — Resolver N+1s and cache invalidation complexity outweigh flexibility for ~30-endpoint surface.\n  - REJECTED: tRPC — Public consumers are not all TypeScript; locks contract to one language ecosystem.\n- Store session tokens in httpOnly SameSite=Lax cookies. — Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.\n  - REJECTED: localStorage — XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage\n  - REJECTED: sessionStorage — Same XSS exposure as localStorage, plus tokens lost on every new tab\n- Use Zustand for client state management in the dashboard. — Global state surface is small (session, filters, toasts); Zustand covers it in ~50 lines without ceremony.\n  - REJECTED: Redux Toolkit — Boilerplate and indirection outweigh benefits at the current state size; team spent more time on slices than features in the spike.\n  - REJECTED: MobX — Implicit reactivity made renders hard to trace during the spike.\n- Implement token-bucket rate limiting at API edge per API key. — Predictable burst behavior; limits configured per plan tier.",
+      "reply": {
+        "proposal": "Leverage the existing Postgres UNLOGGED table for session caching with a write-through pattern: API instances query the UNLOGGED table on every request, and session mutations (login, logout, refresh) write directly to it. Add a connection pool (PgBouncer in transaction mode) at the edge to multiplex connections across instances and reduce per-instance overhead. Instrument query latency to confirm the UNLOGGED table is hitting the 15% benchmark; if drift occurs under production load, we can add prepared statements or query result caching via application-level memoization before considering a second datastore.",
+        "key_technologies": [
+          "Postgres UNLOGGED table",
+          "PgBouncer",
+          "prepared statements (SQL)",
+          "application-level query instrumentation"
+        ],
+        "acknowledged_rejections": [
+          "Redis — ops budget constraint to single datastore until 10x traffic",
+          "In-process memory cache — breaks under multiple API instances",
+          "Sticky sessions — imposes deploy constraint"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s08",
+        "adapter": "robrain-e2e",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s09",
+      "rejected_option": "auto-generated migrations",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Use hand-written, numbered, forward-only SQL migrations for schema changes. — Every schema change is reviewed as literal SQL; forward-only keeps prod and CI history linear.\n  - REJECTED: auto-generated migrations — Generated diff silently included a column drop that reached staging in 2026-03; generated DDL is no longer trusted for schema changes\n  - REJECTED: down migrations — False confidence; most destructive changes cannot actually be reversed; restore-from-backup is the real rollback\n- Cache session lookups in a Postgres UNLOGGED table. — Keeps stack at one datastore; UNLOGGED tables benchmarked within 15% of Redis for session read pattern.\n  - REJECTED: Redis — Second datastore adds provisioning, monitoring, backup, and security overhead; ops budget is one datastore until 10x traffic.\n  - REJECTED: In-process memory cache — Breaks under multiple API instances.\n  - REJECTED: Sticky sessions — Imposes deploy constraint.\n- Maintain public API as REST with OpenAPI specification. — HTTP caching, straightforward auth, mature tooling across languages; sparse fieldsets address overfetching concerns.\n  - REJECTED: GraphQL — Resolver N+1s and cache invalidation complexity outweigh flexibility for ~30-endpoint surface.\n  - REJECTED: tRPC — Public consumers are not all TypeScript; locks contract to one language ecosystem.\n- Query Postgres with postgres.js driver and hand-written SQL with typed row mappers. — Direct SQL keeps query plans visible, avoids runtime abstraction layer, and typed mappers live next to queries.\n  - REJECTED: Prisma — Query engine adds cold-start latency on serverless deploys and hides generated SQL; both issues hit in 2026-02 spike.\n  - REJECTED: TypeORM — Decorator-based entities conflict with functional codebase style.\n- UI strings go through i18n catalog from day one in dashboard app. — Retrofitting i18n was a six-week project previously; catalog-first is cheaper now.",
+      "reply": {
+        "proposal": "This task conflicts with a documented team rejection from 2026-03 when auto-generated migrations silently dropped a column that reached staging. Our prior decision to use hand-written, numbered, forward-only SQL migrations was made *because* generated DDL proved untrustworthy for schema changes. Rather than re-enable auto-generation, we should invest in tooling that makes hand-written migrations faster: a migration template generator, a schema linter that runs in CI to catch common mistakes before review, and a migration diff preview tool that shows exactly what SQL will execute. These reduce the friction of manual migrations without reintroducing the blind-spot risk that burned us before.",
+        "key_technologies": [],
+        "acknowledged_rejections": [
+          "Auto-generated migrations — Rejected 2026-03 after generated diff silently included a destructive column drop that reached staging; team consensus is that generated DDL cannot be trusted for schema changes without full human review of the literal SQL"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s09",
+        "adapter": "robrain-e2e",
+        "trap": "direct",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "robrain-e2e",
+      "scenario": "s10",
+      "rejected_option": "GraphQL",
+      "context": "Relevant prior decisions for this task (from team memory):\n- Maintain public API as REST with OpenAPI specification. — HTTP caching, straightforward auth, mature tooling across languages; sparse fieldsets address overfetching concerns.\n  - REJECTED: GraphQL — Resolver N+1s and cache invalidation complexity outweigh flexibility for ~30-endpoint surface.\n  - REJECTED: tRPC — Public consumers are not all TypeScript; locks contract to one language ecosystem.\n- Version API in URL path (/v1); breaking changes bump the version. — Explicit and cache-friendly; header versioning confused two integration partners in the spike.\n  - REJECTED: Header versioning — Confused two integration partners in the spike\n- Store session tokens in httpOnly SameSite=Lax cookies. — Keeps tokens out of reach of injected scripts; browser attaches automatically so SPA never touches raw token.\n  - REJECTED: localStorage — XSS exfiltration — 2026-04 pentest demonstrated token theft through compromised analytics snippet reading localStorage\n  - REJECTED: sessionStorage — Same XSS exposure as localStorage, plus tokens lost on every new tab\n- Cache session lookups in a Postgres UNLOGGED table. — Keeps stack at one datastore; UNLOGGED tables benchmarked within 15% of Redis for session read pattern.\n  - REJECTED: Redis — Second datastore adds provisioning, monitoring, backup, and security overhead; ops budget is one datastore until 10x traffic.\n  - REJECTED: In-process memory cache — Breaks under multiple API instances.\n  - REJECTED: Sticky sessions — Imposes deploy constraint.\n- Read feature flags from environment variables without a flag service. — A dozen flags do not justify a flag platform; env vars deploy atomically with the code.\n  - REJECTED: Flag service — Unnecessary complexity for a dozen flags",
+      "reply": {
+        "proposal": "Implement sparse fieldsets as a query parameter (e.g., `?fields=id,name,email`) that the REST API honors by returning only requested fields in the JSON response. This is lightweight, cache-friendly, and requires no schema changes—clients simply pass a comma-separated list and the serializer filters output. The approach is mature, well-documented in JSON:API conventions, and pairs cleanly with our OpenAPI specification by documenting the optional `fields` parameter across endpoints. We can roll it out incrementally, starting with the most frequently overfetched resources, and HTTP caches will treat each field selection as a separate cache entry (acceptable given mobile's diverse screen requirements).",
+        "key_technologies": [
+          "REST API query parameters",
+          "JSON serialization filtering",
+          "OpenAPI specification (documentation)",
+          "HTTP caching (field-variant cache keys)"
+        ],
+        "acknowledged_rejections": [
+          "GraphQL — Resolver N+1s and cache invalidation complexity rejected in prior API architecture decision",
+          "tRPC — Locks contract to TypeScript ecosystem; public mobile consumers are not all TypeScript",
+          "Redis or flag service — Not applicable to this task; included for completeness against prior storage decisions"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s10",
+        "adapter": "robrain-e2e",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": true
+      }
+    }
+  ]
+}

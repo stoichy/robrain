@@ -1,0 +1,22 @@
+{
+  "name": "@robrain/vetobench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/run.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "bench": "pnpm build && node dist/run.js",
+    "bench:live": "pnpm build && node dist/run.js --live",
+    "test": "pnpm build && node --test dist/score.test.js dist/adapters.test.js"
+  },
+  "dependencies": {
+    "@robrain/shared": "workspace:*",
+    "mem0ai": "^3.0.13"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}

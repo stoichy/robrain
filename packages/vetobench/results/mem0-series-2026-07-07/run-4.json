@@ -1,0 +1,272 @@
+{
+  "run_at": "2026-07-07T20:30:11.362Z",
+  "agent_provider": "anthropic",
+  "agent_model": "claude-haiku-4-5-20251001",
+  "adapters": [
+    {
+      "name": "mem0",
+      "description": "Mem0 OSS (infer:true extraction) — top-5 semantic search over the same decision prose."
+    }
+  ],
+  "summary": [
+    {
+      "adapter": "mem0",
+      "scenarios": 10,
+      "violations": 2,
+      "violationRate": 0.2,
+      "acknowledgedRate": 0.5,
+      "byTrap": {
+        "direct": {
+          "scenarios": 4,
+          "violations": 0
+        },
+        "implicit": {
+          "scenarios": 6,
+          "violations": 2
+        }
+      }
+    }
+  ],
+  "cells": [
+    {
+      "adapter": "mem0",
+      "scenario": "s01",
+      "rejected_option": "Express",
+      "context": "Relevant memories for this task (from team memory):\n- User settled on keeping the API server on Hono due to its middleware model covering authentication, logging, and rate limiting with minimal overhead, while running identically on Node and edge runtimes.\n- User confirmed the decision to keep the API server on Hono, stating that Hono's middleware model efficiently manages authentication, logging, and rate limiting, with minimal overhead and consistent performance across Node and edge runtimes.\n- User decided to keep the API server on Hono, reaffirming that Hono's middleware model covers authentication, logging, and rate limiting with minimal overhead, and runs identically on both Node and edge runtimes.\n- User confirmed the decision to keep the API server on Hono, highlighting that Hono's middleware model effectively covers authentication, logging, and rate limiting with minimal overhead and runs identically on both Node and edge runtimes.\n- User confirmed the decision to keep the API server on Hono, reiterating that Hono's middleware model effectively covers authentication, logging, and rate limiting with minimal overhead, running identically on both Node and edge runtimes.",
+      "reply": {
+        "proposal": "Leverage Hono's built-in middleware ecosystem to replace the hand-rolled auth, rate limiting, and logging implementations. We'll refactor packages/api to use Hono's middleware composition model, which provides consistent ordering, clean separation of concerns, and standardized error handling across all routes. This approach eliminates duplicate logic, reduces maintenance burden, and ensures our middleware stack behaves identically whether deployed on Node or edge runtimes. We can adopt Hono's official middleware packages (hono/cors, hono/rate-limit) and complement them with a thin custom layer only where business logic requires it.",
+        "key_technologies": [
+          "Hono",
+          "hono/cors",
+          "hono/rate-limit",
+          "hono/logger",
+          "hono/bearer-auth"
+        ],
+        "acknowledged_rejections": []
+      },
+      "verdict": {
+        "scenarioId": "s01",
+        "adapter": "mem0",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": false
+      }
+    },
+    {
+      "adapter": "mem0",
+      "scenario": "s02",
+      "rejected_option": "Redux Toolkit",
+      "context": "Relevant memories for this task (from team memory):\n- User decided to use Zustand for client state in the dashboard (apps/dashboard/src/store.ts) due to its small global state surface (session, filters, toasts), achieving this in approximately 50 lines of code. They rejected Redux Toolkit because its boilerplate and complexity were not justified by the state size, and rejected MobX due to implicit reactivity making renders difficult to track.\n- User reiterated the decision to use Zustand for client state in the dashboard (apps/dashboard/src/store.ts), highlighting that the small global state surface (session, filters, toasts) can be managed in approximately 50 lines of code without unnecessary complexity. They rejected Redux Toolkit due to excessive boilerplate and that it required more time on slices than features, and MobX due to implicit reactivity making renders difficult to track.\n- User confirmed the decision to use Zustand for client state management in the dashboard, emphasizing that the small global state surface (session, filters, toasts) can be handled in approximately 50 lines of code without unnecessary complexity. They rejected Redux Toolkit due to its boilerplate and complexity, and MobX due to implicit reactivity making renders difficult to track.\n- User's decision to use Zustand for client state management in the dashboard (apps/dashboard/src/store.ts) was reiterated, emphasizing that their small global state surface (session, filters, toasts) can be effectively managed in approximately 50 lines of code without unnecessary complexity.\n- User confirmed the decision to use Zustand for client state management in the dashboard, emphasizing that their small global state surface (session, filters, toasts) is adequately handled in approximately 50 lines of code without unnecessary complexity.",
+      "reply": {
+        "proposal": "We should not add Redux Toolkit to the dashboard. Our team has consistently decided that Zustand is the right fit for our state surface—session, filters, and toasts—which can be cleanly managed in ~50 lines of code. Instead of introducing Redux Toolkit's boilerplate overhead, we should refactor the existing Zustand store to improve organization: split it into logical modules (auth.ts, filters.ts, ui.ts), add clear action grouping, and implement better selectors to prevent unnecessary re-renders. This maintains our intentional simplicity while addressing the messiness through better code structure within our chosen tool.",
+        "key_technologies": [
+          "Zustand"
+        ],
+        "acknowledged_rejections": [
+          "Redux Toolkit—rejected multiple times due to excessive boilerplate, complexity not justified by our small state surface, and the overhead of maintaining slices distracting from feature work"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s02",
+        "adapter": "mem0",
+        "trap": "direct",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "mem0",
+      "scenario": "s03",
+      "rejected_option": "Prisma",
+      "context": "Relevant memories for this task (from team memory):\n- User rejected using Prisma due to its query engine adding cold-start latency on serverless deploys and hiding generated SQL, issues they encountered during a spike in February 2026.\n- User also considered and rejected using Prisma due to its query engine adding cold-start latency on serverless deploys and hiding generated SQL, which were issues encountered during a spike in February 2026.\n- User considered and rejected using Prisma due to its query engine adding cold-start latency on serverless deploys and hiding generated SQL, which were issues encountered during a spike in February 2026, as well as TypeORM due to conflicts with their functional codebase style.\n- User considered and rejected using Prisma due to its query engine adding cold-start latency on serverless deploys and hiding generated SQL, which were issues encountered during a spike in February 2026.\n- User previously considered and rejected using Prisma due to its query engine adding cold-start latency on serverless deploys and hiding generated SQL, which they experienced during a spike in February 2026.",
+      "reply": {
+        "proposal": "Instead of Prisma, I recommend implementing a lightweight SQL query builder like Kysely paired with generated TypeScript types from a schema migration tool. This approach provides type-safe database access without Prisma's query engine overhead that caused cold-start latency issues in our February 2026 serverless spike. Kysely compiles to raw SQL at build time, giving us visibility into generated queries while maintaining type safety. We can use a schema-first approach with tools like sql-migrate or similar to keep SQL explicit and performant for our serverless deployment constraints.",
+        "key_technologies": [
+          "Kysely",
+          "sql-migrate",
+          "TypeScript type generation",
+          "Raw SQL with parameterized queries"
+        ],
+        "acknowledged_rejections": [
+          "Prisma - rejected due to query engine cold-start latency on serverless deploys and SQL obfuscation issues experienced in February 2026",
+          "TypeORM - rejected due to conflicts with functional codebase style"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s03",
+        "adapter": "mem0",
+        "trap": "direct",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "mem0",
+      "scenario": "s04",
+      "rejected_option": "axios",
+      "context": "Relevant memories for this task (from team memory):\n- User's decision for the Public API is to remain REST with an OpenAPI spec, with advantages such as HTTP caching, straightforward authentication, and mature tooling across all client languages, while implementing sparse fieldsets to address overfetching concerns,\n- User confirmed that the decision for packages/api/src/errors.ts was to use the problem+json envelope for all API errors, referencing RFC 7807 to provide clients with a consistent error shape while mapping internal codes to documented types.\n- User decided that all API errors will use the problem+json envelope for error handling in packages/api/src/errors.ts, following RFC 7807 to provide clients with a consistent error shape while mapping internal codes to documented types.\n- User was reminded that the decision for packages/api/src/errors.ts is to use the problem+json envelope for all API errors, referencing RFC 7807 to provide clients with a consistent error shape while mapping internal codes to documented types.\n- User settled on using the problem+json envelope for all API errors in packages/api/src/errors.ts, referencing RFC 7807 as the rationale to provide clients with a consistent error shape while mapping internal codes to documented types.",
+      "reply": {
+        "proposal": "Implement an HTTP client wrapper using axios or node-fetch with a retry strategy (exponential backoff with jitter), configurable timeouts per request type, and error transformation that maps billing provider responses into our RFC 7807 problem+json envelope for consistency with the rest of the API. Create a dedicated billing provider client module in packages/api/src/clients/ that handles authentication (API key/bearer token), request/response logging, and wraps provider errors with appropriate HTTP status codes and problem+json types. Use a retry library like retry-axios or async-retry to manage transient failures transparently while respecting the provider's rate limits and SLA requirements.",
+        "key_technologies": [
+          "axios",
+          "retry-axios",
+          "node-fetch",
+          "async-retry",
+          "RFC 7807 problem+json"
+        ],
+        "acknowledged_rejections": []
+      },
+      "verdict": {
+        "scenarioId": "s04",
+        "adapter": "mem0",
+        "trap": "implicit",
+        "violation": true,
+        "acknowledged": false,
+        "matchedOn": "key_technologies: axios"
+      }
+    },
+    {
+      "adapter": "mem0",
+      "scenario": "s05",
+      "rejected_option": "localStorage",
+      "context": "Relevant memories for this task (from team memory):\n- User decided to store session tokens in httpOnly SameSite=Lax cookies to keep them out of reach of injected scripts, with the browser attaching them automatically so the SPA never processes the raw token directly.\n- User confirmed the decision to store session tokens in httpOnly SameSite=Lax cookies to keep them out of reach of injected scripts and allow the browser to attach them automatically so the SPA doesn't process raw tokens.\n- User decided to store session tokens in httpOnly SameSite=Lax cookies, keeping them out of reach of injected scripts, allowing the browser to manage them automatically without the SPA accessing the raw tokens.\n- User confirmed the decision to store session tokens in httpOnly SameSite=Lax cookies, keeping them out of reach of injected scripts, allowing the browser to manage them automatically without the SPA accessing the raw tokens.\n- User's decision was to store session tokens in httpOnly SameSite=Lax cookies to keep them secure from injected scripts, allowing the browser to manage them automatically without direct handling by the SPA.",
+      "reply": {
+        "proposal": "Maintain the httpOnly SameSite=Lax cookie approach for the primary session token storage, as this decision was explicitly confirmed multiple times by the team for XSS protection. For mobile web scenarios where fetch calls need explicit token attachment, configure the backend to accept the token from either the automatic cookie header OR a custom header (e.g., X-Session-Token) that the SPA reads from a separate non-httpOnly cookie. This dual-path approach allows mobile web to read a mirrored token from JavaScript while keeping the secure httpOnly cookie as the source of truth and primary transmission mechanism.",
+        "key_technologies": [
+          "httpOnly SameSite=Lax cookies",
+          "custom HTTP headers (X-Session-Token or similar)",
+          "fetch API with credentials: 'include' option",
+          "dual-cookie pattern (httpOnly + JavaScript-readable mirror)"
+        ],
+        "acknowledged_rejections": [
+          "Storing the primary session token in a JavaScript-readable cookie—conflicts with the team's established decision to keep tokens out of JavaScript reach via httpOnly protection",
+          "Removing httpOnly flag from the session token cookie—directly contradicts the confirmed XSS defense strategy",
+          "Having the SPA manage raw token storage entirely—rejected by prior team consensus that the browser should handle token lifecycle automatically"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s05",
+        "adapter": "mem0",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": false
+      }
+    },
+    {
+      "adapter": "mem0",
+      "scenario": "s06",
+      "rejected_option": "Jest",
+      "context": "Relevant memories for this task (from team memory):\n- User considered and rejected Jest for unit testing as ESM support still requires transform workarounds and config drift across packages cost two days during their March 2026 attempt.\n- User rejected Jest for unit testing because ESM support still requires transform workarounds, and they experienced config drift across packages which cost two days in their March 2026 attempt.\n- User considered and rejected Jest for unit testing because ESM support still requires transform workarounds and config drift across packages cost them two days during their March 2026 attempt.\n- User rejected Jest for unit testing due to the ongoing need for transform workarounds with ESM support and the config drift that cost two days during their March 2026 attempt.\n- User settled on running unit tests with the built-in node:test runner for the project in packages/api/package.json, emphasizing zero test-framework dependencies and that node --test runs TypeScript output directly without requiring a transform config for CI.",
+      "reply": {
+        "proposal": "We should not add Jest to packages/api. The team has a well-established decision to use Node's built-in node:test runner, which eliminates the ESM transform workarounds and config drift issues that cost two days in March 2026. Since packages/api already has node:test configured in package.json with zero test-framework dependencies, we can write request handler tests immediately using the native test runner via `node --test`, keeping our testing setup lightweight and avoiding the maintenance burden Jest introduces across our monorepo.",
+        "key_technologies": [
+          "node:test"
+        ],
+        "acknowledged_rejections": [
+          "Jest for unit testing - rejected due to ESM transform workarounds requirement, config drift across packages, and prior two-day cost in March 2026 attempt"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s06",
+        "adapter": "mem0",
+        "trap": "direct",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "mem0",
+      "scenario": "s07",
+      "rejected_option": "styled-components",
+      "context": "Relevant memories for this task (from team memory):\n- User requested clarification on the styling decision for the dashboard in apps/dashboard/tailwind.config.ts, settling on using Tailwind utility classes due to their advantages including no runtime style computation, compatibility with React Server Components, and centralized design tokens.\n- User settled on styling the dashboard in apps/dashboard/tailwind.config.ts with Tailwind utility classes, as it avoids runtime style computation, works with React Server Components, and consolidates design tokens in one configuration.\n- User confirmed the decision to style the dashboard in apps/dashboard/tailwind.config.ts with Tailwind utility classes. The rationale includes avoiding runtime style computation, compatibility with React Server Components, and consolidating design tokens in one configuration.\n- User reiterated that styled-components were rejected for the dashboard styling because they were incompatible with React Server Components and contributed an additional ~12KB to the bundle.\n- User decided to style the dashboard with Tailwind utility classes because it avoids runtime style computation, works well with React Server Components, and consolidates design tokens in one configuration.",
+      "reply": {
+        "proposal": "Adopt Tailwind utility classes for the marketing pages, maintaining consistency with the dashboard's existing styling approach. While the designer prefers component-scoped styles, we can achieve strong component encapsulation using Tailwind's utility-first methodology combined with well-organized component files—each component can have its Tailwind classes clearly scoped within its implementation. This approach preserves our established benefits: zero runtime overhead, React Server Component compatibility, centralized design tokens in tailwind.config.ts, and keeps our bundle lean. We can enhance the developer experience by documenting component patterns and creating Tailwind component extensions (@apply rules) for commonly repeated patterns if needed.",
+        "key_technologies": [
+          "Tailwind CSS",
+          "React Server Components",
+          "tailwind.config.ts"
+        ],
+        "acknowledged_rejections": [
+          "styled-components - rejected due to RSC incompatibility and ~12KB bundle penalty",
+          "CSS Modules with component-scoped files - would diverge from established dashboard styling and create maintenance inconsistency across the app"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s07",
+        "adapter": "mem0",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "mem0",
+      "scenario": "s08",
+      "rejected_option": "Redis",
+      "context": "Relevant memories for this task (from team memory):\n- User settled on caching session lookups in a Postgres UNLOGGED table, which maintains a single datastore and benchmarks within 15% of Redis for session reads on July 7, 2026.\n- User rejected the use of an in-process memory cache for session caching because it breaks under multiple API instances.\n- User decided against using an in-process memory cache for session lookups because it would break under multiple API instances.\n- User decided against using an in-process memory cache for session lookups due to its inability to support multiple API instances, which led to concerns about breakage under multiple API instances.\n- User decided against using an in-process memory cache for session lookups due to its inability to support multiple API instances.",
+      "reply": {
+        "proposal": "Implement a caching layer using Postgres UNLOGGED tables as we've already validated, building on our July 7, 2026 benchmark that showed it performs within 15% of Redis while maintaining a single datastore. Add query result caching with appropriate TTL values and connection pooling to optimize read performance across all API instances. Implement cache invalidation hooks tied to session state changes to ensure data consistency. This approach avoids the multi-instance breakage issues we encountered with in-process memory caches while leveraging our existing Postgres infrastructure.",
+        "key_technologies": [
+          "PostgreSQL UNLOGGED tables",
+          "Connection pooling (pgBouncer or similar)",
+          "Query result caching with TTL",
+          "Cache invalidation via triggers or application hooks"
+        ],
+        "acknowledged_rejections": [
+          "In-process memory cache for session lookups - breaks under multiple API instances"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s08",
+        "adapter": "mem0",
+        "trap": "implicit",
+        "violation": true,
+        "acknowledged": false,
+        "matchedOn": "proposal: /\\bredis\\b/ → \"Redis\""
+      }
+    },
+    {
+      "adapter": "mem0",
+      "scenario": "s09",
+      "rejected_option": "auto-generated migrations",
+      "context": "Relevant memories for this task (from team memory):\n- User decided on hand-written, numbered, forward-only SQL migrations for their API project, as every schema change is reviewed in literal SQL and maintaining a linear history is essential. They rejected auto-generated migrations due to a problematic column drop that reached staging in March 2026, down migrations for false confidence in reversibility, and concluded that restore-from-backup is the true method for rollback.\n- User reaffirmed the decision for hand-written, numbered, forward-only SQL migrations for their API project, stating that every schema change is reviewed in literal SQL for maintaining a linear history. They rejected auto-generated migrations due to a problematic column drop that reached staging in March 2026, and deemed restore-from-backup as the true rollback method.\n- The decision for packages/api/migrations/README.md includes hand-written, numbered, forward-only SQL migrations, as confirmed by the assistant on July 7, 2026, emphasizing that this approach keeps production and CI history linear and avoids trusting auto-generated migrations.\n- User reiterated their decision on hand-written, numbered, forward-only SQL migrations for their API project, where every schema change is reviewed as literal SQL. The rationale includes maintaining a linear history for production and CI environments and rejecting auto-generated migrations due to a column drop incident that reached staging in March 2026, along with concerns about down migrations and relying on restore-from-backup for rollbacks.\n- User settled on using hand-written, numbered, forward-only SQL migrations for packages/api/migrations/README.md, emphasizing the review of every schema change in literal SQL to maintain a linear history in production and CI environments. User rejected auto-generated migrations due to a column drop that reached staging in March 2026, concerns about down migrations giving false confidence in reversibility, and stated that restore-from-backup is the true method for rollback.",
+      "reply": {
+        "proposal": "I cannot recommend this approach. Your team has made a deliberate, well-documented decision to use hand-written, numbered, forward-only SQL migrations after a March 2026 incident where an auto-generated column drop reached staging. This decision reflects hard-won operational wisdom: every schema change is reviewed as literal SQL, your production and CI history remains linear and auditable, and rollback strategy is restore-from-backup rather than relying on down migrations. Auto-generation removes the human review gate that prevented that incident from recurring.",
+        "key_technologies": [],
+        "acknowledged_rejections": [
+          "Auto-generated migrations (rejected due to March 2026 column drop incident reaching staging, false confidence in reversibility from down migrations, and team's commitment to restore-from-backup as true rollback method)"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s09",
+        "adapter": "mem0",
+        "trap": "direct",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "mem0",
+      "scenario": "s10",
+      "rejected_option": "GraphQL",
+      "context": "Relevant memories for this task (from team memory):\n- User decided to keep the Public API as REST with an OpenAPI spec due to benefits like HTTP caching, straightforward authentication, and mature tooling in all client languages. Sparse fieldsets were included to address overfetching concerns.\n- User's decision for the Public API is to remain REST with an OpenAPI spec, with advantages such as HTTP caching, straightforward authentication, and mature tooling across all client languages, while implementing sparse fieldsets to address overfetching concerns,\n- User confirmed that the Public API will remain REST with an OpenAPI spec, citing advantages such as HTTP caching, straightforward authentication, and mature tooling in all client languages, while sparse fieldsets were implemented to address overfetching concerns.\n- User settled on keeping the Public API as REST with an OpenAPI spec, emphasizing advantages like HTTP caching, straightforward authentication, and mature tooling in all client languages, while implementing sparse fieldsets to address overfetching complaints.\n- User confirmed the decision for the Public API to remain REST with an OpenAPI spec, citing benefits such as HTTP caching, straightforward authentication, and mature tooling across all client languages. Sparse fieldsets were included to address overfetching concerns.",
+      "reply": {
+        "proposal": "Implement query parameter-based sparse fieldsets on our existing REST API, allowing clients to specify exactly which fields to retrieve via a `fields` query parameter (e.g., `GET /users/123?fields=id,name,email`). This approach leverages our existing OpenAPI spec infrastructure by documenting the sparse fieldsets capability in the specification, enabling code generators and client libraries to expose this as a first-class feature. The mobile team can immediately reduce payload sizes by requesting only required fields, while maintaining full backward compatibility for clients that don't use the parameter. We can progressively document common field combinations in our OpenAPI spec to guide mobile developers toward optimal queries.",
+        "key_technologies": [
+          "REST API query parameters",
+          "OpenAPI 3.0 specification extensions",
+          "Field filtering middleware/interceptor",
+          "HTTP response compression (gzip)"
+        ],
+        "acknowledged_rejections": []
+      },
+      "verdict": {
+        "scenarioId": "s10",
+        "adapter": "mem0",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+name: robrain
+version: 1.0.0
+description: "RoBrain decision memory — self-hosted capture of decisions AND rejected alternatives (structured vetoes), with composite-scored recall so the agent never re-proposes what you already ruled out."

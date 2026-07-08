@@ -1,25 +1,43 @@
 {
-  "name": "@context-system/sensing-mcp",
-  "version": "2.2.0",
-  "private": true,
+  "name": "@robrain/sensing-mcp",
+  "version": "2.3.0",
   "type": "module",
+  "description": "RoBrain Sensing MCP server — passive decision capture for AI coding agents",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adelinamart/robrain.git",
+    "directory": "packages/sensing-mcp"
+  },
+  "homepage": "https://github.com/adelinamart/robrain#readme",
+  "bugs": {
+    "url": "https://github.com/adelinamart/robrain/issues"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "main": "./dist/index.js",
   "bin": {
     "sensing-mcp": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "node build.mjs",
+    "prepublishOnly": "node build.mjs",
     "dev": "node build.mjs",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "bun test src"
   },
-  "dependencies": {
+  "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@robrain/shared": "workspace:*",
-    "zod": "^3.23.0"
-  },
-  "devDependencies": {
+    "zod": "^3.23.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.4.0",
     "@types/node": "^20.0.0"

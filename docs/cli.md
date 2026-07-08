@@ -10,13 +10,48 @@ Install details, editor setup, and the full command table.
 
 Self-hosted setup usually needs two keys: **`ANTHROPIC_API_KEY`** for extraction and one embedding-provider key for semantic retrieval. If that surprises you, see [Why are there two API keys in self-hosted mode?](https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#why-are-there-two-api-keys-in-self-hosted-mode).
 
-#### Prerequisites
+#### No clone needed (`robrain up`)
+
+The fastest path — no git clone, no `pnpm build`:
+
+```bash
+export ANTHROPIC_API_KEY=... OPENAI_API_KEY=...   # or add them to ~/.robrain/stack/.env after the first run
+npx robrain@latest up                             # Postgres + Perception from ghcr.io
+npx robrain install --self-hosted                 # wire Sensing MCP into your editors
+cd /path/to/your/project && npx robrain init-project
+```
+
+`robrain up` writes a managed stack under **`~/.robrain/stack/`**:
+
+| File | Role |
+|------|------|
+| `docker-compose.yml` | Regenerated every run — do not edit |
+| `schema.sql` | Extracted from the Perception image (version-matched) |
+| `.env` | Your secrets — auto-generated once, never overwritten |
+
+Default image: `ghcr.io/adelinamart/robrain-perception:<cli-version>`. Override with `--tag` or `--image`:
+
+```bash
+npx robrain up --tag latest
+npx robrain up --image ghcr.io/adelinamart/robrain-perception:2.3.0
+```
+
+Stop the stack (data volume preserved):
+
+```bash
+npx robrain down
+```
+
+`robrain up` and the repo-clone flow (`pnpm docker:up`) use the **same container names and Postgres volume** (`robrain_postgres_data`), so you can switch paths without losing data — copy `POSTGRES_PASSWORD` and `PERCEPTION_API_KEY` from your existing `.env` into `~/.robrain/stack/.env` if you migrate.
+
+`robrain install --self-hosted` copies the bundled `@robrain/sensing-mcp` package into `~/.robrain/mcp/sensing` — no clone required. Pass **`--repo-root`** (or set `ROBRAIN_REPO`) when developing in the monorepo; that **replaces** any package-copied bundle with a symlink into your clone (macOS/Linux) or a fresh copy (Windows).
+
+#### From a clone instead (development)
+
 - Docker + Docker Compose
 - Node.js **18.18+** (older 18.x + npm 9.6 can break `npx` bin permissions; upgrade Node or use `pnpm dlx robrain`), pnpm
 - Anthropic API key (for Haiku extraction)
 - OpenAI, Voyage, or Cohere API key (for embeddings)
-
-#### Repo setup and `.env`
 
 From the repository root:
 
@@ -103,9 +138,18 @@ stop landing, check `PERCEPTION_API_KEY` in the managed block (see [troubleshoot
 
 ## Upgrading
 
-When a new RoBrain release is out, update every layer you installed: the **git clone** (CLI + Sensing MCP), the **Perception Docker image**, and **editor MCP configs**. Your Postgres data and repo-root `.env` stay in place — you are not reinstalling from scratch.
+When a new RoBrain release is out, update every layer you installed: the **CLI** (`npx` or global), the **Perception Docker image**, and **editor MCP configs**. Postgres data and your `.env` secrets stay in place — you are not reinstalling from scratch.
 
-Check what you are running: `npx robrain --version` (or the `version` field in the clone’s root `package.json`). Compare with [GitHub — Releases](https://github.com/adelinamart/robrain/releases) or the latest `main` branch.
+Check what you are running: `npx robrain --version`. Compare with [GitHub — Releases](https://github.com/adelinamart/robrain/releases) or the latest `main` branch.
+
+### No-clone stack (`robrain up`)
+
+```bash
+npx robrain@latest up --tag <version>    # pull new Perception image; same ~/.robrain/stack/.env
+npx robrain@latest install --self-hosted   # refresh editor MCP configs + sensing bundle
+```
+
+Fully quit and reopen editors after install (`Cmd-Q` on macOS, then reopen).
 
 ### Self-hosted from a clone (typical)
 
@@ -133,9 +177,11 @@ More detail on stale containers and schema drift: [Troubleshooting — Stale Per
 
 ```bash
 npm install -g robrain@latest
+npx robrain up --tag latest          # if you use the no-clone stack
+npx robrain install --self-hosted    # refresh editor configs + sensing bundle
 ```
 
-That updates the CLI on your PATH only. **Self-hosted Docker still requires the clone steps above** — Perception and `ROBRAIN_REPO` live in the repo, not in the global package.
+For the **clone path**, a global CLI update alone is not enough — Perception still requires `pnpm docker:up:build` from the repo:
 
 ```bash
 cd /path/to/robrain
@@ -198,6 +244,10 @@ All commands accept `--help` for full flag details. Repo-level `pnpm` scripts li
 
 | Command | What it does |
 |---------|-------------|
+| `npx robrain up` | Start Postgres + Perception from the published GHCR image (no clone); writes `~/.robrain/stack/` |
+| `npx robrain up --tag <tag>` | Perception image tag (default: CLI version) |
+| `npx robrain up --image <image>` | Full image override (wins over `--tag`) |
+| `npx robrain down` | Stop the `robrain up` stack; data volume `robrain_postgres_data` is preserved |
 | `pnpm install:self-hosted` | Build everything + run `robrain install --self-hosted --repo-root .` in one shot |
 | `pnpm build` | Compile all workspace packages (`pnpm -r build`) — run after `pnpm install` in the robrain clone |
 | `pnpm docker:up` | Start Postgres + Perception (uses `.env`) |
@@ -210,7 +260,7 @@ All commands accept `--help` for full flag details. Repo-level `pnpm` scripts li
 | `npx robrain install --token <token>` | Authenticate against Rory Plans cloud (or set `RORY_TOKEN`) |
 | `npx robrain install --editor <claude-code\|cursor\|copilot\|codex>` | Target a specific editor instead of all detected |
 | `npx robrain install --perception-url <url>` | Override Perception URL for self-hosted (default `http://localhost:3001`) |
-| `npx robrain install --repo-root <path>` | Path to the robrain clone — needed so MCP bundle gets linked (or set `ROBRAIN_REPO`) |
+| `npx robrain install --repo-root <path>` | Dev override: symlink/copy sensing-mcp from the clone (replaces any package-copied bundle; or set `ROBRAIN_REPO`) |
 | `npx robrain install --skip-init-project` | Wire editors only — do not run **`init-project`** in the current directory after install |
 | `npx robrain init-project` | Warm-start memory from package.json, README, git log |
 | `npx robrain init-project --project-id <id>` | Override the auto-derived project ID (useful after `projects merge`) |

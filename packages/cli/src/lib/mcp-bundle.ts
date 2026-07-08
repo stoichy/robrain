@@ -1,9 +1,10 @@
 // packages/cli/src/lib/mcp-bundle.ts
 // Copy or symlink built MCP packages into ~/.robrain/mcp so editor configs resolve.
 
-import { cpSync, existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { platform } from 'os'
-import { join } from 'path'
+import { dirname, join } from 'path'
 
 export class McpBundleError extends Error {
   override name = 'McpBundleError'
@@ -23,6 +24,78 @@ export function sensingBundleReady(robrainMcpDir: string): boolean {
   return existsSync(join(base, 'dist', 'index.js')) && existsSync(join(base, 'package.json'))
 }
 
+/**
+ * Locate the @robrain/sensing-mcp package installed alongside this CLI (it is a
+ * regular dependency, so any npm/npx/pnpm install of `robrain` carries it).
+ * Returns the package directory, or undefined when running from a source tree
+ * where it has not been linked/built.
+ */
+export function resolveInstalledSensingMcpDir(): string | undefined {
+  try {
+    const req = createRequire(import.meta.url)
+    return dirname(req.resolve('@robrain/sensing-mcp/package.json'))
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Materialize ~/.robrain/mcp/sensing from the @robrain/sensing-mcp package that
+ * ships with the CLI. Always a copy, never a symlink: npx runs the CLI out of an
+ * ephemeral cache, so a symlink into it would dangle by the next editor launch.
+ * The bundle is a single self-contained file, so the copy needs no node_modules.
+ *
+ * Skips the copy when the destination was already materialized from the same
+ * package version. A symlinked destination (a previous --repo-root dev install)
+ * is replaced: default installs track the published package, and dev installs
+ * re-assert themselves by passing --repo-root again.
+ *
+ * Returns true when the bundle is ready, false when the package cannot be
+ * resolved or has no built dist (caller falls back to other sources).
+ */
+export function ensureSensingMcpBundleFromPackage(robrainMcpDir: string): boolean {
+  const pkgDir = resolveInstalledSensingMcpDir()
+  if (!pkgDir) return false
+  return materializeSensingBundle(pkgDir, robrainMcpDir)
+}
+
+/** Exposed for tests: same copy logic, explicit source package directory. */
+export function materializeSensingBundle(pkgDir: string, robrainMcpDir: string): boolean {
+  const srcEntry = join(pkgDir, 'dist', 'index.js')
+  if (!existsSync(srcEntry)) return false
+
+  let version = ''
+  try {
+    version = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')).version ?? ''
+  } catch {
+    return false
+  }
+
+  const dest = join(robrainMcpDir, 'sensing')
+  if (sensingBundleReady(robrainMcpDir) && !lstatSync(dest).isSymbolicLink()) {
+    try {
+      const current = JSON.parse(readFileSync(join(dest, 'package.json'), 'utf8'))
+      if (current.version === version) return true
+    } catch {
+      // unreadable marker — fall through and re-copy
+    }
+  }
+
+  mkdirSync(robrainMcpDir, { recursive: true })
+  if (existsSync(dest)) rmSync(dest, { recursive: true, force: true })
+  mkdirSync(dest, { recursive: true })
+  cpSync(join(pkgDir, 'dist'), join(dest, 'dist'), { recursive: true })
+  writeFileSync(
+    join(dest, 'package.json'),
+    JSON.stringify(
+      { name: 'robrain-sensing-mcp', version, private: true, type: 'module', main: './dist/index.js' },
+      null,
+      2,
+    ) + '\n',
+  )
+  return true
+}
+
 /** True when a Control MCP entrypoint exists (cloud installs only; not in OSS repo). */
 export function controlBundleReady(robrainMcpDir: string): boolean {
   return existsSync(join(robrainMcpDir, 'control', 'dist', 'index.js'))
@@ -31,8 +104,8 @@ export function controlBundleReady(robrainMcpDir: string): boolean {
 /**
  * Ensure ~/.robrain/mcp/sensing resolves to a built sensing-mcp bundle.
  *
- * macOS/Linux: directory symlink into the workspace package — the package's own
- * package.json and (for dev rebuilds) a fresh dist are picked up automatically.
+ * macOS/Linux: directory symlink into the workspace package — always replaces
+ * any existing package-copied bundle so `--repo-root` re-asserts dev installs.
  *
  * Windows: copy the *self-contained* artifact only — the bundled dist plus a
  * minimal package.json declaring ESM. We deliberately do NOT copy the package's
@@ -44,8 +117,6 @@ export function controlBundleReady(robrainMcpDir: string): boolean {
  * needed at the destination.
  */
 export function ensureSensingMcpBundle(repoRoot: string, robrainMcpDir: string): void {
-  if (sensingBundleReady(robrainMcpDir)) return
-
   const src = join(repoRoot, 'packages', 'sensing-mcp')
   const srcEntry = join(src, 'dist', 'index.js')
   if (!existsSync(srcEntry)) {

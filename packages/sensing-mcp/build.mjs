@@ -9,6 +9,11 @@
 // run. This replaces plain `tsc`, whose unbundled output left bare
 // `import '@robrain/shared'` calls that only resolved via the monorepo's pnpm
 // symlink farm — and broke the moment the package was copied out of it.
+//
+// Because everything is inlined, package.json declares NO runtime dependencies —
+// they all live in devDependencies. Keep it that way: a runtime dependency on
+// @robrain/shared (private, unpublished) would make the published npm package
+// uninstallable.
 // ─────────────────────────────────────────────────────────────
 import { build } from 'esbuild'
 import { rmSync } from 'node:fs'

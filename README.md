@@ -26,6 +26,17 @@ How it works, the two pillars (capture + judgment), and the full walkthrough: [d
 
 ## Install
 
+No clone needed — `robrain up` pulls the published Perception image and generates credentials into `~/.robrain/stack/.env`:
+
+```bash
+export ANTHROPIC_API_KEY=... OPENAI_API_KEY=...   # or add them to ~/.robrain/stack/.env after the first run
+npx robrain@latest up                             # start Postgres + Perception from ghcr.io
+npx robrain install --self-hosted                 # wire Sensing MCP into your editors
+```
+
+<details>
+<summary>From a clone instead (development, or building the image yourself)</summary>
+
 First `pnpm docker:up` auto-creates `.env` and fills `PERCEPTION_API_KEY` / `POSTGRES_PASSWORD`. Perception still needs your LLM + embedding keys before it stays up.
 
 ```bash
@@ -37,6 +48,8 @@ pnpm docker:up                 # first run: creates .env; Perception won't start
 pnpm docker:up                 # second run: Perception now boots
 npx robrain install --self-hosted --repo-root "$(pwd)"
 ```
+
+</details>
 
 OpenAI-only: set `LLM_PROVIDER=openai` and `OPENAI_API_KEY` instead of Anthropic — see [Concepts — Prefer not to use Anthropic](docs/concepts.md#prefer-not-to-use-anthropic-run-openai-only).
 

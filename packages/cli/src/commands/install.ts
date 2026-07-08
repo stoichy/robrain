@@ -22,6 +22,7 @@ import {
 } from '../lib/editor.js'
 import {
   ensureSensingMcpBundle,
+  ensureSensingMcpBundleFromPackage,
   controlBundleReady,
   sensingBundleReady,
   McpBundleError,
@@ -73,25 +74,35 @@ function resolveRepoRoot(opts: InstallOptions): string | undefined {
 
 function prepareMcpBundles(opts: InstallOptions): void {
   const repoRoot = resolveRepoRoot(opts)
-  if (!repoRoot && !sensingBundleReady(ROBRAIN_MCP_DIR)) {
-    console.log(chalk.red('\n  ✗ Sensing MCP bundle missing.'))
-    console.log(chalk.dim('    Expected: ') + join(ROBRAIN_MCP_DIR, 'sensing', 'dist', 'index.js'))
-    console.log(chalk.dim('\n    Fix: from your robrain clone run ') + chalk.cyan('pnpm install') + chalk.dim(' + ') + chalk.cyan('pnpm build'))
-    console.log(chalk.dim('    Then reinstall with: ') + chalk.cyan('robrain install --repo-root /path/to/robrain'))
-    console.log(chalk.dim('    (or set ') + chalk.cyan('ROBRAIN_REPO') + chalk.dim(' to that path)\n'))
-    process.exit(1)
-  }
-  if (!repoRoot && sensingBundleReady(ROBRAIN_MCP_DIR)) return
 
-  try {
-    ensureSensingMcpBundle(repoRoot!, ROBRAIN_MCP_DIR)
-  } catch (e) {
-    if (e instanceof McpBundleError) {
-      console.log(chalk.red(`\n  ✗ ${e.message}\n`))
-      process.exit(1)
+  // Explicit --repo-root / ROBRAIN_REPO is a dev override: link the clone's build.
+  if (repoRoot) {
+    try {
+      ensureSensingMcpBundle(repoRoot, ROBRAIN_MCP_DIR)
+      return
+    } catch (e) {
+      if (e instanceof McpBundleError) {
+        console.log(chalk.red(`\n  ✗ ${e.message}\n`))
+        process.exit(1)
+      }
+      throw e
     }
-    throw e
   }
+
+  // Default path: copy the @robrain/sensing-mcp package that ships with the CLI —
+  // works from a bare `npx robrain install`, no clone or pnpm build required.
+  if (ensureSensingMcpBundleFromPackage(ROBRAIN_MCP_DIR)) return
+
+  // Package not resolvable (source-tree run without a built workspace); keep any
+  // previously materialized bundle rather than failing the whole install.
+  if (sensingBundleReady(ROBRAIN_MCP_DIR)) return
+
+  console.log(chalk.red('\n  ✗ Sensing MCP bundle missing.'))
+  console.log(chalk.dim('    Expected: ') + join(ROBRAIN_MCP_DIR, 'sensing', 'dist', 'index.js'))
+  console.log(chalk.dim('\n    Fix: run ') + chalk.cyan('npx robrain@latest install') + chalk.dim(' (bundles the Sensing server),'))
+  console.log(chalk.dim('    or from a robrain clone run ') + chalk.cyan('pnpm install') + chalk.dim(' + ') + chalk.cyan('pnpm build') + chalk.dim(', then'))
+  console.log(chalk.dim('    reinstall with ') + chalk.cyan('robrain install --repo-root /path/to/robrain') + chalk.dim(' (or set ') + chalk.cyan('ROBRAIN_REPO') + chalk.dim(')\n'))
+  process.exit(1)
 }
 
 export async function installCommand(opts: InstallOptions): Promise<void> {
@@ -247,7 +258,7 @@ export async function installCommand(opts: InstallOptions): Promise<void> {
     planningKey:       provisioned.planningKey,
     embeddingProvider: embeddingProvider ?? 'openai',
     installedAt:       new Date().toISOString(),
-    version:           '2.2.0',
+    version:           '2.3.0',
   })
 
   spinner.succeed('MCP servers configured')
@@ -416,7 +427,7 @@ async function installSelfHosted(opts: InstallOptions): Promise<void> {
     ...(perceptionKey ? { perceptionKey } : {}),
     embeddingProvider: provider,
     installedAt:       new Date().toISOString(),
-    version:           '2.2.0',
+    version:           '2.3.0',
     selfHosted:        true,
   })
 

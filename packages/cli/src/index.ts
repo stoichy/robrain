@@ -27,8 +27,9 @@ import { exportInterchangeCommand } from './commands/export-interchange.js'
 import { outcomesScanCommand, outcomesRecordCommand } from './commands/outcomes.js'
 import { explainCommand }      from './commands/explain.js'
 import { projectsListCommand, projectsMergeCommand } from './commands/projects.js'
+import { upCommand, downCommand, DEFAULT_IMAGE_REPO } from './commands/up.js'
 
-const VERSION = '2.2.0'
+const VERSION = '2.3.0'
 
 program
   .name('robrain')
@@ -144,6 +145,24 @@ outcomesCmd
   .option('--evidence <text>',        'Supporting evidence (commit hash, incident link, note)')
   .action(async (decisionId: string, opts: { outcome: string; evidence?: string }) => {
     await outcomesRecordCommand(decisionId, opts)
+  })
+
+// ── up / down — clone-free self-hosted stack ──────────────────
+
+program
+  .command('up')
+  .description('Start the self-hosted Perception stack (Postgres + Perception) from the published Docker image — no repo clone needed')
+  .option('--tag <tag>',     `Perception image tag (default: CLI version ${VERSION})`)
+  .option('--image <image>', `Full image override (default: ${DEFAULT_IMAGE_REPO}:<tag>)`)
+  .action(async (opts: { tag?: string; image?: string }) => {
+    await upCommand({ tag: opts.tag, image: opts.image, cliVersion: VERSION })
+  })
+
+program
+  .command('down')
+  .description('Stop the self-hosted Perception stack started by robrain up (data volume is preserved)')
+  .action(async () => {
+    await downCommand()
   })
 
 // ── install ───────────────────────────────────────────────────
@@ -263,10 +282,9 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
 })
 
 program.addHelpText('afterAll', `
-  Self-hosted quick start:
-    pnpm install && pnpm build                      In the robrain clone (builds sensing-mcp before install)
-    pnpm docker:up                                  Start Postgres + Perception
-    npx robrain install --self-hosted --repo-root <robrain-clone>   Wire Sensing (needs built MCP bundle)
+  Self-hosted quick start (no clone needed):
+    npx robrain up                                  Start Postgres + Perception from the published image
+    npx robrain install --self-hosted               Wire Sensing MCP into your editors
     npx robrain init-project                        Warm-start memory from codebase
     npx robrain doctor                              Something not capturing? Diagnose the whole setup
     npx robrain review                              Review captured decisions
@@ -277,6 +295,9 @@ program.addHelpText('afterAll', `
     npx robrain outcomes --dry-run                  Match git reverts against stored decisions
     npx robrain export --format interchange         Dump memories as portable JSONL (robrain-memory/v1)
     npx robrain synth --dry-run                     Run Synthesis from the robrain clone (needs DATABASE_URL + ANTHROPIC_API_KEY)
+
+  From a robrain clone instead (dev): pnpm install && pnpm build, pnpm docker:up,
+  then npx robrain install --self-hosted --repo-root <robrain-clone>.
 
   Cloud quick start (automatic injection, no paste):
     npx robrain install --token YOUR_TOKEN      Authenticate with Rory Plans

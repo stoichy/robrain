@@ -4,7 +4,7 @@
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { platform } from 'os'
-import { dirname, join } from 'path'
+import { dirname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 
 export class McpBundleError extends Error {
@@ -94,7 +94,9 @@ export function materializeSensingBundle(pkgDir: string, robrainMcpDir: string):
   }
 
   mkdirSync(robrainMcpDir, { recursive: true })
-  if (existsSync(dest)) rmSync(dest, { recursive: true, force: true })
+  // Unconditional rm: a dangling symlink at dest reads as absent to existsSync
+  // but still blocks the mkdir/copy below.
+  rmSync(dest, { recursive: true, force: true })
   mkdirSync(dest, { recursive: true })
   cpSync(join(pkgDir, 'dist'), join(dest, 'dist'), { recursive: true })
   writeFileSync(
@@ -129,7 +131,9 @@ export function controlBundleReady(robrainMcpDir: string): boolean {
  * needed at the destination.
  */
 export function ensureSensingMcpBundle(repoRoot: string, robrainMcpDir: string): void {
-  const src = join(repoRoot, 'packages', 'sensing-mcp')
+  // resolve, not join: `--repo-root .` passes a relative path that would be
+  // stored verbatim in the symlink and dangle when read against robrainMcpDir.
+  const src = resolve(repoRoot, 'packages', 'sensing-mcp')
   const srcEntry = join(src, 'dist', 'index.js')
   if (!existsSync(srcEntry)) {
     throw new McpBundleError(
@@ -140,9 +144,9 @@ export function ensureSensingMcpBundle(repoRoot: string, robrainMcpDir: string):
   mkdirSync(robrainMcpDir, { recursive: true })
   const dest = join(robrainMcpDir, 'sensing')
 
-  if (existsSync(dest)) {
-    rmSync(dest, { recursive: true, force: true })
-  }
+  // Unconditional rm: existsSync follows symlinks, so a dangling link reads as
+  // absent, survives a guarded rm, and crashes symlinkSync below with EEXIST.
+  rmSync(dest, { recursive: true, force: true })
 
   if (platform() === 'win32') {
     mkdirSync(dest, { recursive: true })

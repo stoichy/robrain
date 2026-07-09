@@ -51,6 +51,17 @@ npx robrain install --self-hosted --repo-root "$(pwd)"
 
 </details>
 
+### Claude Code plugin
+
+Claude Code users can add hook-based capture and pre-task warnings about previously rejected approaches — no CLAUDE.md protocol needed:
+
+```bash
+claude plugin marketplace add adelinamart/robrain
+claude plugin install robrain@robrain
+```
+
+Details: [plugins/claude-code](plugins/claude-code/README.md). `robrain init-project` also recommends the plugin to collaborators via the project's `.claude/settings.json`, so teammates get an install prompt from Claude Code itself (opt out with `--skip-claude-plugin`).
+
 OpenAI-only: set `LLM_PROVIDER=openai` and `OPENAI_API_KEY` instead of Anthropic — see [Concepts — Prefer not to use Anthropic](docs/concepts.md#prefer-not-to-use-anthropic-run-openai-only).
 
 Upgrading on a new release, from your robrain clone: `git pull` → `pnpm install && pnpm build` → `pnpm docker:up:build` → `npx robrain install --self-hosted --repo-root "$(pwd)"` → fully restart editors. Full checklist: [CLI reference — Upgrading](docs/cli.md#upgrading).
@@ -74,7 +85,7 @@ npx robrain synth                 # drift, contradictions, entity promotion
 npx robrain review                # inspect / approve captured rows
 ```
 
-After `init-project`, every repo gets `CLAUDE.md` and `AGENTS.md` (Codex CLI), and Cursor also gets `.cursor/rules/robrain.mdc` with `alwaysApply: true`. If captures don't land: [Troubleshooting](docs/troubleshooting.md).
+After `init-project`, every repo gets `CLAUDE.md` and `AGENTS.md` (Codex CLI), and Cursor also gets `.cursor/rules/robrain.mdc` with `alwaysApply: true`. If captures don't land, run `npx robrain doctor` — see [Troubleshooting](docs/troubleshooting.md).
 
 ## Synthesis
 
@@ -186,6 +197,7 @@ Also on by default: secrets redaction (API keys, tokens, private keys, connectio
 - Troubleshooting (silent 401s, Docker rebuilds, stale summaries) → [docs/troubleshooting.md](docs/troubleshooting.md)
 - Memory interchange format (`robrain export`, `robrain-memory/v1` JSONL) → [docs/memory-interchange.md](docs/memory-interchange.md)
 - VetoBench (does memory stop rejected re-proposals? methodology + archived receipts) → [packages/vetobench/README.md](packages/vetobench/README.md)
+- Claude Code plugin (hook-based capture + veto warnings) → [plugins/claude-code/README.md](plugins/claude-code/README.md)
 
 ## Contributing
 

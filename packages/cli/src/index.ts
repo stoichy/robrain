@@ -204,8 +204,9 @@ program
   .alias('init')
   .description('Warm-start project memory from your codebase (run once per project)')
   .option('--project-id <id>', 'Override the auto-derived project ID')
-  .action(async (opts: { projectId?: string }) => {
-    await initProjectCommand({ projectId: opts.projectId })
+  .option('--skip-claude-plugin', 'Do not recommend the RoBrain Claude Code plugin in .claude/settings.json')
+  .action(async (opts: { projectId?: string; skipClaudePlugin?: boolean }) => {
+    await initProjectCommand({ projectId: opts.projectId, skipClaudePlugin: opts.skipClaudePlugin })
   })
 
 // ── projects — list / merge Perception project ids ────────────

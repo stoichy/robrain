@@ -1,0 +1,17 @@
+{
+  "name": "robrain",
+  "owner": { "name": "Rory Plans", "url": "https://roryplans.ai" },
+  "metadata": {
+    "description": "RoBrain plugins — decision memory with rejected-alternative warnings for AI coding agents"
+  },
+  "plugins": [
+    {
+      "name": "robrain",
+      "source": "./plugins/claude-code",
+      "description": "Deterministic decision capture + pre-task veto warnings from your self-hosted RoBrain stack",
+      "category": "productivity",
+      "tags": ["memory", "decisions", "institutional-memory"],
+      "license": "Apache-2.0"
+    }
+  ]
+}

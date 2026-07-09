@@ -6,7 +6,7 @@ describe('renderStackCompose', () => {
   const compose = renderStackCompose(`${DEFAULT_IMAGE_REPO}:2.3.2`)
 
   it('runs Perception from the published image with an env override hook', () => {
-    assert.match(compose, /image: \$\{PERCEPTION_IMAGE:-ghcr\.io\/adelinamart\/robrain-perception:2\.3\.1\}/)
+    assert.match(compose, /image: \$\{PERCEPTION_IMAGE:-ghcr\.io\/adelinamart\/robrain-perception:2\.3\.2\}/)
     assert.doesNotMatch(compose, /build:/)
   })
 

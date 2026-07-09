@@ -18,6 +18,7 @@ import { cwd } from 'process'
 import { existsSync, readFileSync } from 'fs'
 import { dirname, join } from 'path'
 import { readConfig, isAuthenticated } from '../lib/config.js'
+import { recommendClaudePlugin } from '../lib/claude-plugin.js'
 import { gatherProjectInfo, seedProjectMemory } from '../lib/project.js'
 import { detectEditors, writeClaudeMd, writeCursorRoBrainRule, writeAgentsMd } from '../lib/editor.js'
 import type { RoBrainInstructionMode } from '../lib/editor.js'
@@ -26,6 +27,8 @@ interface InitProjectOptions {
   projectId?:        string
   /** When true, skip the confirm prompt (e.g. chained from `robrain install`). */
   nonInteractive?: boolean
+  /** Do not recommend the Claude Code plugin in .claude/settings.json. */
+  skipClaudePlugin?: boolean
 }
 
 export async function initProjectCommand(opts: InitProjectOptions): Promise<void> {
@@ -114,6 +117,21 @@ export async function initProjectCommand(opts: InitProjectOptions): Promise<void
     cursorRuleApplied = writeCursorRoBrainRule(projectRoot, resolvedProjectId, instructionMode)
   }
   mdSpinner.succeed(`Editor instructions updated (${instructionExtras})`)
+
+  // ── Recommend the Claude Code plugin to the team ───────────
+  // Written to .claude/settings.json: teammates who trust this repo get an
+  // install prompt from Claude Code itself. Same footprint as CLAUDE.md —
+  // a repo-committed recommendation, not an install; each teammate still
+  // approves the install in their own editor.
+  let pluginRecommendation: ReturnType<typeof recommendClaudePlugin> | 'skipped' = 'skipped'
+  if (!opts.skipClaudePlugin) {
+    pluginRecommendation = recommendClaudePlugin(projectRoot)
+    if (pluginRecommendation === 'written') {
+      console.log(chalk.dim('  .claude/settings.json: recommends the RoBrain plugin to collaborators (skip with --skip-claude-plugin)'))
+    } else if (pluginRecommendation === 'skipped-unreadable') {
+      console.log(chalk.yellow('  ⚠ .claude/settings.json is not valid JSON — left untouched. Add the RoBrain plugin recommendation manually if wanted.'))
+    }
+  }
 
   // ── Seed memory ────────────────────────────────────────────
   const seedSpinner = ora({ text: 'Inferring architectural decisions from codebase...', color: 'green' }).start()

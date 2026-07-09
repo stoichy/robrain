@@ -785,7 +785,7 @@
               </tr>
               <tr>
                 <th scope="row">Warns the agent before it suggests something you ruled out</th>
-                <td>Cloud: yes, automatic.<br>Self-hosted: yes, via <code>inject</code>.</td>
+                <td>Cloud: yes, automatic.<br>Self-hosted: yes — automatic in Claude Code via the plugin, or via <code>inject</code>.</td>
                 <td class="muted">No</td>
                 <td class="muted">No</td>
                 <td class="muted">No</td>
@@ -941,6 +941,49 @@ npx robrain export-memory --ledger
           Install details: <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md#install-and-setup">docs/cli.md</a> ·
           <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md#upgrading">Upgrading</a> ·
           <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#how-it-works">Concept walkthrough</a>.
+        </p>
+      </section>
+
+      <p class="section-bridge">
+        Using Claude Code? Skip the MCP-call discipline — wire capture and warnings into the editor itself.
+      </p>
+
+      <section class="card">
+        <h2><span class="icon">◇</span> Claude Code plugin</h2>
+        <p>
+          The RoBrain plugin wires capture and rejection-warnings straight into Claude Code's lifecycle — no reliance on
+          the model remembering to call an MCP tool. It talks only to the self-hosted Perception URL you already
+          configured, and every hook <strong>fails open</strong>: if your stack is down or unconfigured, your session is
+          unaffected.
+        </p>
+        <div class="arch-block">
+          <h3>Session start</h3>
+          <p>
+            Injects the <strong class="always-on-summary">always-on summary</strong> — top decisions with their rejected
+            alternatives — into every new session.
+          </p>
+        </div>
+        <div class="arch-block">
+          <h3>Before each prompt</h3>
+          <p>
+            Semantic-searches the decision corpus with your prompt and warns the agent <strong>before it starts</strong>
+            when the task touches a decision you already ruled out.
+          </p>
+        </div>
+        <div class="arch-block">
+          <h3>Turn end</h3>
+          <p>
+            Ships the completed turn to Perception for server-side extraction (async) — capture becomes deterministic
+            instead of best-effort.
+          </p>
+        </div>
+        <p class="code-label">Add the plugin</p>
+        <pre><code>claude plugin marketplace add adelinamart/robrain
+claude plugin install robrain@robrain</code></pre>
+        <p style="margin-top: 0.65rem; font-size: 0.95rem">
+          Runs alongside the Sensing MCP — Perception deduplicates server-side, so nothing is double-captured. With the
+          plugin installed, the <code>sensing_record_turn</code> block in <code>CLAUDE.md</code> becomes optional, and
+          decisions still surface in Cursor, Copilot, and Codex through the same store.
         </p>
       </section>
 

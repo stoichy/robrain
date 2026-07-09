@@ -80,6 +80,8 @@ Keep `EMBEDDING_PROVIDER` identical between this file and what you select when r
 
 `init-project` always writes the same managed RoBrain block into `AGENTS.md` at the project root (for Codex CLI and any tool that reads AGENTS.md). If Codex CLI is installed (`~/.codex/`), `robrain install` also registers `robrain-sensing` in `~/.codex/config.toml` (use `--editor codex` to configure Codex only).
 
+For Claude Code, `init-project` also merges a plugin recommendation into `.claude/settings.json` so teammates who trust the repo get an install prompt from Claude Code itself. Skip with `--skip-claude-plugin`. Details: [plugins/claude-code/README.md](../plugins/claude-code/README.md).
+
 #### CLI on your `PATH` (optional)
 
 If you prefer not to use `npx` every time, install the package globally, then use the `robrain` command directly:
@@ -262,8 +264,9 @@ All commands accept `--help` for full flag details. Repo-level `pnpm` scripts li
 | `npx robrain install --perception-url <url>` | Override Perception URL for self-hosted (default `http://localhost:3001`) |
 | `npx robrain install --repo-root <path>` | Dev override: symlink/copy sensing-mcp from the clone (replaces any package-copied bundle; or set `ROBRAIN_REPO`) |
 | `npx robrain install --skip-init-project` | Wire editors only — do not run **`init-project`** in the current directory after install |
-| `npx robrain init-project` | Warm-start memory from package.json, README, git log |
+| `npx robrain init-project` | Warm-start memory from package.json, README, git log; recommends the Claude Code plugin in `.claude/settings.json` |
 | `npx robrain init-project --project-id <id>` | Override the auto-derived project ID (useful after `projects merge`) |
+| `npx robrain init-project --skip-claude-plugin` | Do not write the RoBrain plugin recommendation to `.claude/settings.json` |
 | `npx robrain init` | Alias for `init-project` |
 | `npx robrain projects list` | List Perception projects with session/decision counts (recover phantom ids) |
 | `npx robrain projects merge <from-id> <to-id>` | Merge one project id into another in the database |

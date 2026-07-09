@@ -1,0 +1,189 @@
+// plugins/claude-code/hooks/lib.mjs
+// ─────────────────────────────────────────────────────────────
+// Shared plumbing for RoBrain Claude Code plugin hooks.
+//
+// Design constraints:
+//  - Zero dependencies, Node >= 18 (built-in fetch). Hooks must start fast.
+//  - Fail-open ALWAYS: a dead Perception, missing config, or timeout must
+//    never block or break the user's Claude Code session. Hooks print nothing
+//    and exit 0 on any failure.
+//  - Thin client: raw turns go to Perception POST /signals with
+//    needs_classification=true — classification/extraction/dedup happen
+//    server-side, so this plugin (and future Codex/Cursor ports) stays dumb.
+// ─────────────────────────────────────────────────────────────
+
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+
+/** Read all of stdin (the hook input JSON). */
+export async function readStdin() {
+  const chunks = []
+  for await (const chunk of process.stdin) chunks.push(chunk)
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+export function parseHookInput(raw) {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Perception connection: env wins, then ~/.robrain/config.json (written by
+ * `robrain up` / `robrain install`), then localhost default.
+ */
+export function loadPerception() {
+  let url = process.env.PERCEPTION_URL?.trim() || ''
+  let key = process.env.PERCEPTION_API_KEY?.trim() || ''
+  if (!url || !key) {
+    try {
+      const cfg = JSON.parse(readFileSync(join(homedir(), '.robrain', 'config.json'), 'utf8'))
+      if (!url && typeof cfg.perceptionUrl === 'string') url = cfg.perceptionUrl.trim()
+      if (!key && typeof cfg.perceptionKey === 'string') key = cfg.perceptionKey.trim()
+    } catch {
+      // no config yet — fall through to defaults
+    }
+  }
+  return { url: url || 'http://localhost:3001', key }
+}
+
+/**
+ * Same derivation as the CLI (packages/cli/src/lib/project.ts): prefer the
+ * project_id init-project wrote into CLAUDE.md / AGENTS.md / the Cursor rule,
+ * else a stable hash of the working directory.
+ */
+export function resolveProjectId(cwd) {
+  for (const rel of ['CLAUDE.md', 'AGENTS.md', join('.cursor', 'rules', 'robrain.mdc')]) {
+    const p = join(cwd, rel)
+    try {
+      if (!existsSync(p)) continue
+      const match = readFileSync(p, 'utf8').match(/project_id="([^"]+)"/)
+      if (match?.[1]) return match[1].trim()
+    } catch {
+      // unreadable file — try the next candidate
+    }
+  }
+  return createHash('sha256').update(cwd).digest('hex').slice(0, 12)
+}
+
+/** fetch with a hard timeout; returns null instead of throwing. */
+export async function perceptionFetch(path, { url, key }, init = {}, timeoutMs = 2500) {
+  try {
+    const res = await fetch(`${url}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { Authorization: `Bearer ${key}` } : {}),
+        ...(init.headers ?? {}),
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Extract the trailing turn from a Claude Code transcript (JSONL): the last
+ * user text message and every assistant text block after it, plus file paths
+ * touched by Edit/Write/NotebookEdit tool calls in that span.
+ */
+export function extractLastTurn(transcriptPath) {
+  let lines
+  try {
+    lines = readFileSync(transcriptPath, 'utf8').split('\n').filter(Boolean)
+  } catch {
+    return null
+  }
+
+  let lastUserIdx = -1
+  const entries = []
+  for (const line of lines) {
+    let e
+    try {
+      e = JSON.parse(line)
+    } catch {
+      continue
+    }
+    entries.push(e)
+  }
+
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i]
+    if (e.type === 'user' && !e.isMeta && typeof textOf(e.message?.content) === 'string' && textOf(e.message.content).trim()) {
+      // Skip tool_result-only user entries (tool outputs come back as user role)
+      if (hasOnlyToolResults(e.message?.content)) continue
+      lastUserIdx = i
+      break
+    }
+  }
+  if (lastUserIdx === -1) return null
+
+  const userMessage = textOf(entries[lastUserIdx].message?.content) ?? ''
+  const replyParts = []
+  const filesTouched = new Set()
+
+  for (let i = lastUserIdx + 1; i < entries.length; i++) {
+    const e = entries[i]
+    if (e.type !== 'assistant') continue
+    const content = e.message?.content
+    if (!Array.isArray(content)) continue
+    for (const block of content) {
+      if (block.type === 'text' && block.text?.trim()) replyParts.push(block.text)
+      if (block.type === 'tool_use') {
+        const fp = block.input?.file_path ?? block.input?.notebook_path
+        if (typeof fp === 'string' && fp) filesTouched.add(fp)
+      }
+    }
+  }
+
+  if (!userMessage.trim() || replyParts.length === 0) return null
+
+  // Sequence: number of user-authored messages up to and including this one —
+  // stable across re-reads of the same transcript.
+  let sequence = 0
+  for (let i = 0; i <= lastUserIdx; i++) {
+    const e = entries[i]
+    if (e.type === 'user' && !e.isMeta && !hasOnlyToolResults(e.message?.content) && textOf(e.message?.content)?.trim()) sequence++
+  }
+
+  return {
+    userMessage,
+    claudeReply: replyParts.join('\n\n'),
+    filesTouched: [...filesTouched].slice(0, 50),
+    sequence: Math.max(1, sequence),
+  }
+}
+
+function textOf(content) {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content.filter(b => b.type === 'text').map(b => b.text ?? '').join('\n')
+  }
+  return null
+}
+
+function hasOnlyToolResults(content) {
+  return Array.isArray(content) && content.length > 0 && content.every(b => b.type === 'tool_result')
+}
+
+/** Emit hook JSON output (context injection) and exit 0. */
+export function emitContext(hookEventName, additionalContext) {
+  if (additionalContext) {
+    process.stdout.write(JSON.stringify({
+      hookSpecificOutput: { hookEventName, additionalContext },
+    }))
+  }
+  process.exit(0)
+}
+
+/** Silent success — hooks must never fail the session. */
+export function exitSilently() {
+  process.exit(0)
+}

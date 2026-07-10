@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.adelinamart/robrain",
+  "description": "Self-hosted decision memory for AI coding agents — captures decisions and the alternatives you rejected, then warns before an agent re-proposes a rejected approach.",
+  "repository": {
+    "url": "https://github.com/adelinamart/robrain",
+    "source": "github"
+  },
+  "version": "2.3.7",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "robrain",
+      "version": "2.3.7",
+      "transport": { "type": "stdio" },
+      "packageArguments": [
+        { "type": "positional", "value": "mcp" }
+      ],
+      "environmentVariables": [
+        {
+          "name": "PERCEPTION_API_URL",
+          "description": "Perception API URL. Optional — read from ~/.robrain/config.json after `npx robrain up`.",
+          "isRequired": false,
+          "default": "http://localhost:3001"
+        },
+        {
+          "name": "PERCEPTION_API_KEY",
+          "description": "Perception API key. Optional — read from ~/.robrain/config.json after `npx robrain up`.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

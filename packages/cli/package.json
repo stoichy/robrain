@@ -1,10 +1,11 @@
 {
   "name": "robrain",
-  "version": "2.3.6",
+  "version": "2.3.7",
   "type": "module",
   "description": "RoBrain CLI for installation, setup, and memory workflows",
   "author": "Rory Plans, Inc.",
   "license": "Apache-2.0",
+  "mcpName": "io.github.adelinamart/robrain",
   "keywords": [
     "ai",
     "agent",

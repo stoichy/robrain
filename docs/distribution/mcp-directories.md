@@ -92,38 +92,37 @@ PR description: paste the longer blurb above + "Apache-2.0, self-hosted, receipt
 
 ## 2. Official MCP Registry (modelcontextprotocol/registry) → feeds PulseMCP
 
-The registry is the canonical index many directories ingest. It expects a
-`server.json` describing a **package** (npm/pypi/oci) or a **remote** endpoint.
+The registry is the canonical index many directories ingest. The manifest lives
+at repo root — **[`server.json`](../../server.json)** (already committed, schema
+`2025-12-11`) — pointing at the published `robrain` npm package + the `robrain mcp`
+launch command.
 
-The server runs via the published `robrain` npm package + the `robrain mcp`
-launch command (shipped in robrain ≥2.3.6). Draft `server.json` — set `version`
-fields to match the npm release you publish:
+### Ownership prerequisite (the gotcha)
 
-```json
-{
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
-  "name": "io.github.adelinamart/robrain",
-  "description": "Self-hosted decision memory for AI coding agents — captures decisions and rejected alternatives, warns before an agent re-proposes a rejected approach.",
-  "repository": { "url": "https://github.com/adelinamart/robrain", "source": "github" },
-  "version": "2.3.6",
-  "packages": [
-    {
-      "registryType": "npm",
-      "identifier": "robrain",
-      "version": "2.3.6",
-      "transport": { "type": "stdio" },
-      "runtimeArguments": [{ "type": "positional", "value": "mcp" }],
-      "environmentVariables": [
-        { "name": "PERCEPTION_API_URL", "description": "Perception API URL (or omit — read from ~/.robrain/config.json)", "isRequired": false, "default": "http://localhost:3001" },
-        { "name": "PERCEPTION_API_KEY", "description": "Perception API key (or omit — read from ~/.robrain/config.json after `npx robrain up`)", "isRequired": false, "isSecret": true }
-      ]
-    }
-  ]
-}
+The registry verifies you own the package by requiring **`"mcpName":
+"io.github.adelinamart/robrain"`** in the **published** `robrain` package.json.
+That field is added in `packages/cli/package.json`, but the currently-published
+2.3.6 predates it — so a fresh release is required:
+
+1. Bump `packages/cli` to **2.3.7** (matches `server.json`'s `version` fields).
+2. `pnpm --filter robrain publish` — publishes 2.3.7 with `mcpName`.
+3. Confirm: `npm view robrain@2.3.7 mcpName` → `io.github.adelinamart/robrain`.
+
+(If you publish a different version number, set both `version` fields in
+`server.json` to match it.)
+
+### Publish to the registry
+
+```bash
+# Install the publisher CLI (macOS):
+brew install mcp-publisher      # or: download the binary from the registry releases page
+
+mcp-publisher login github      # OAuth — authorizes the io.github.adelinamart/* namespace
+mcp-publisher publish           # reads ./server.json, validates against the live npm package
 ```
 
-Publish with the `mcp-publisher` CLI (GitHub-auth namespace `io.github.adelinamart`).
-Ready once a release with `robrain mcp` is on npm (≥2.3.6).
+`mcp-publisher init` can regenerate `server.json` from the project if you'd
+rather not hand-edit it. Once accepted, PulseMCP ingests it automatically (§4).
 
 ## 3. mcp.so
 
@@ -175,7 +174,7 @@ startCommand:
 
 ## Suggested execution sequence
 
-1. `git push` + publish the release to npm (the `robrain mcp` command ships in ≥2.3.6). Unblocks every portable config below.
+1. `git push` + publish **robrain@2.3.7** to npm (`mcpName` + `robrain mcp`). Unblocks registry submit and portable configs below.
 2. **awesome-mcp-servers PR** — highest leverage, no npm dependency (repo link only); also lands on Glama.
 3. **mcp.so form** — quick, crawls the repo.
 4. **Official MCP Registry** `server.json` — feeds PulseMCP automatically.

@@ -106,6 +106,17 @@ def test_save_config_writes_json(tmp_path):
     }
 
 
+def test_save_config_rejects_non_url_base_url(tmp_path):
+    provider = RoBrainProvider()
+    provider.save_config(
+        {"base_url": "2c77d41b4cdeadbeef", "project_id": "p1", "scope": "team"},
+        str(tmp_path),
+    )
+    written = json.loads((tmp_path / "robrain" / "config.json").read_text())
+    assert written["base_url"] == "http://localhost:3001"
+    assert written["project_id"] == "p1"
+
+
 # -- capture gating ------------------------------------------------------------
 
 

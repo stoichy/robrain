@@ -102,12 +102,12 @@ assuming that command exists:
   "name": "io.github.adelinamart/robrain",
   "description": "Self-hosted decision memory for AI coding agents — captures decisions and rejected alternatives, warns before an agent re-proposes a rejected approach.",
   "repository": { "url": "https://github.com/adelinamart/robrain", "source": "github" },
-  "version": "2.3.4",
+  "version": "2.3.5",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "robrain",
-      "version": "2.3.4",
+      "version": "2.3.5",
       "transport": { "type": "stdio" },
       "runtimeArguments": [{ "type": "positional", "value": "mcp" }],
       "environmentVariables": [

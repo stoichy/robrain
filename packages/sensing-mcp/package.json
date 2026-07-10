@@ -1,6 +1,6 @@
 {
   "name": "@robrain/sensing-mcp",
-  "version": "2.3.4",
+  "version": "2.3.5",
   "type": "module",
   "description": "RoBrain Sensing MCP server — passive decision capture for AI coding agents",
   "license": "Apache-2.0",

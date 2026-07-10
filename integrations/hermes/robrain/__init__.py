@@ -415,8 +415,20 @@ class RoBrainProvider(MemoryProvider):
     def save_config(self, values: Dict[str, Any], hermes_home: str) -> None:
         path = self._config_path(hermes_home)
         path.parent.mkdir(parents=True, exist_ok=True)
+        # Defensive: an interactive-setup mispaste can land the API key in a
+        # text field. A base_url that isn't a URL would fail silently later
+        # (fail-open hides it), so fall back to the default instead — and
+        # never persist something that looks like a pasted secret.
+        base_url = str(values.get("base_url") or "").strip()
+        if not base_url.startswith(("http://", "https://")):
+            if base_url:
+                logger.warning(
+                    "robrain: ignoring non-URL base_url from setup (%r…) — using default",
+                    base_url[:8],
+                )
+            base_url = "http://localhost:3001"
         config = {
-            "base_url": values.get("base_url") or "http://localhost:3001",
+            "base_url": base_url,
             "project_id": values.get("project_id") or "default",
             "scope": values.get("scope") or "team",
         }

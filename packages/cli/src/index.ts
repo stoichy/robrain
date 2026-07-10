@@ -9,7 +9,7 @@
 //   init-project   Warm-start memory from existing codebase
 //   status         Show auth status + service health
 //   doctor         Diagnose install, editor wiring, keys, and service health
-//   rule           Add / list / remove explicit Planning rules
+//   rule           Add / list explicit Planning rules
 //   logout         Clear local credentials
 // ─────────────────────────────────────────────────────────────
 
@@ -28,8 +28,9 @@ import { outcomesScanCommand, outcomesRecordCommand } from './commands/outcomes.
 import { explainCommand }      from './commands/explain.js'
 import { projectsListCommand, projectsMergeCommand } from './commands/projects.js'
 import { upCommand, downCommand, DEFAULT_IMAGE_REPO } from './commands/up.js'
+import { installHermesPlugin, resolveHermesHome } from './lib/hermes-plugin.js'
 
-const VERSION = '2.3.3'
+const VERSION = '2.3.4'
 
 program
   .name('robrain')
@@ -173,6 +174,7 @@ program
   .option('-t, --token <token>',      'Rory Plans API token (or set RORY_TOKEN env var)')
   .option('-e, --editor <editor>',    'Target editor: claude-code | cursor | copilot | codex')
   .option('--self-hosted',            'Self-hosted mode — skip Rory Plans auth')
+  .option('--hermes',                 'Install the Hermes memory-provider plugin into $HERMES_HOME/plugins')
   .option('--perception-url <url>',   'Perception URL for self-hosted mode (default: http://localhost:3001)')
   .option(
     '--repo-root <path>',
@@ -183,10 +185,26 @@ program
     token?: string
     editor?: string
     selfHosted?: boolean
+    hermes?: boolean
     perceptionUrl?: string
     repoRoot?: string
     skipInitProject?: boolean
   }) => {
+    if (opts.hermes) {
+      const { dest } = installHermesPlugin()
+      console.log(`✔ Hermes memory-provider plugin installed → ${dest}`)
+      console.log('\nNext steps:')
+      console.log('  1. hermes memory setup          # select "robrain"')
+      console.log('  2. PERCEPTION_API_KEY lives in ~/.robrain/stack/.env (after `robrain up`)')
+      console.log('     or your repo .env (clone path)')
+      console.log(`\nHermes home: ${resolveHermesHome()} (override with HERMES_HOME)`)
+      // --hermes alone is a complete install; editor wiring only runs when
+      // another install intent is present.
+      if (!opts.token && !opts.selfHosted && !opts.editor && !opts.repoRoot && !process.env.RORY_TOKEN) {
+        return
+      }
+      console.log('')
+    }
     await installCommand({
       token:            opts.token ?? process.env.RORY_TOKEN,
       editor:           opts.editor,
@@ -254,9 +272,8 @@ program
   .description('Manage explicit Planning rules (Rory Plans cloud Planning API — not OSS Perception)')
   .option('--add <text>',    'Add a new rule in plain language')
   .option('--list',          'List active rules for this project')
-  .option('--remove <id>',   'Remove a rule by ID')
   .option('--type <type>',   'Rule type: always_include | always_exclude | preference (default: preference)')
-  .action(async (opts: { add?: string; list?: boolean; remove?: string; type?: string }) => {
+  .action(async (opts: { add?: string; list?: boolean; type?: string }) => {
     await ruleCommand(opts)
   })
 

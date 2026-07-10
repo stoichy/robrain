@@ -19,6 +19,7 @@ mkdirSync(work, { recursive: true })
 
 try {
   execFileSync('node', ['scripts/vendor-sensing-mcp.mjs'], { cwd: cliRoot, stdio: 'inherit' })
+  execFileSync('node', ['scripts/vendor-hermes-plugin.mjs'], { cwd: cliRoot, stdio: 'inherit' })
 
   execFileSync('pnpm', ['pack', '--pack-destination', work], { cwd: cliRoot, stdio: 'inherit' })
 
@@ -49,7 +50,27 @@ try {
     fail(`resolved dir has no dist/index.js: ${dir}`)
   }
 
-  console.log(`pack:verify ok — vendor resolves from ${dir}`)
+  const hermesVendorEntry = join(extracted, 'vendor', 'hermes-plugin', 'robrain', '__init__.py')
+  if (!existsSync(hermesVendorEntry)) {
+    fail('vendor/hermes-plugin/robrain/__init__.py missing from tarball')
+  }
+
+  const hermesUrl = pathToFileURL(join(extracted, 'dist', 'lib', 'hermes-plugin.js')).href
+  const { installHermesPlugin, resolveHermesPluginSourceDir } = await import(hermesUrl)
+  const hermesSrc = resolveHermesPluginSourceDir()
+  // realpath both sides — on macOS the tmpdir is reached via the /var →
+  // /private/var symlink, so raw prefix comparison false-negatives.
+  const { realpathSync } = await import('fs')
+  if (!hermesSrc || !realpathSync(hermesSrc).startsWith(realpathSync(extracted))) {
+    fail(`resolveHermesPluginSourceDir() did not resolve inside the tarball: ${hermesSrc}`)
+  }
+  const hermesHome = join(work, 'hermes-home')
+  const { dest } = installHermesPlugin(hermesHome)
+  if (!existsSync(join(dest, 'plugin.yaml'))) {
+    fail(`installHermesPlugin() copy incomplete at ${dest}`)
+  }
+
+  console.log(`pack:verify ok — sensing vendor resolves from ${dir}; hermes plugin installs from ${hermesSrc}`)
 } finally {
   rmSync(work, { recursive: true, force: true })
 }

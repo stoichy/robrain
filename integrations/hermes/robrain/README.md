@@ -46,12 +46,16 @@ the same lifecycle hooks as bundled providers.
 
    Add `ANTHROPIC_API_KEY` and your embedding key to `~/.robrain/stack/.env` (after `robrain up`) or the repo `.env` (clone path), then ensure Perception is healthy: `curl -sf http://localhost:3001/health`.
 
-2. Install the plugin (from your robrain checkout; `$HERMES_HOME` defaults
-   to `~/.hermes` on macOS/Linux):
+2. Install the plugin — no clone needed; the published CLI carries it:
 
    ```bash
-   cp -r integrations/hermes/robrain "${HERMES_HOME:-$HOME/.hermes}/plugins/robrain"
+   npx robrain@latest install --hermes
    ```
+
+   (`$HERMES_HOME` defaults to `~/.hermes` on macOS/Linux; the command
+   respects the env var. From a repo clone, `cp -r
+   integrations/hermes/robrain "${HERMES_HOME:-$HOME/.hermes}/plugins/robrain"`
+   does the same thing.)
 
 3. Point Hermes at it:
 

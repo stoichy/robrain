@@ -81,12 +81,10 @@ export async function statusCommand(): Promise<void> {
 // ─────────────────────────────────────────────────────────────
 // robrain rule --add TEXT [--type always_include|always_exclude|preference]
 //               --list
-//               --remove ID
 
 export async function ruleCommand(opts: {
   add?:    string
   list?:   boolean
-  remove?: string
   type?:   string
 }): Promise<void> {
   console.log()

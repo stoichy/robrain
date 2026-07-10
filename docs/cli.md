@@ -44,7 +44,7 @@ npx robrain down
 
 `robrain up` and the repo-clone flow (`pnpm docker:up`) use the **same container names and Postgres volume** (`robrain_postgres_data`), so you can switch paths without losing data — copy `POSTGRES_PASSWORD` and `PERCEPTION_API_KEY` from your existing `.env` into `~/.robrain/stack/.env` if you migrate.
 
-`robrain install --self-hosted` copies the bundled `@robrain/sensing-mcp` package into `~/.robrain/mcp/sensing` — no clone required. Pass **`--repo-root`** (or set `ROBRAIN_REPO`) when developing in the monorepo; that **replaces** any package-copied bundle with a symlink into your clone (macOS/Linux) or a fresh copy (Windows).
+`robrain install --self-hosted` copies the bundled `@robrain/sensing-mcp` package into `~/.robrain/mcp/sensing` — no clone required. `robrain install --hermes` materializes the bundled Hermes memory-provider plugin into `$HERMES_HOME/plugins/robrain` (default `~/.hermes`) the same way — see [integrations/hermes](../integrations/hermes/robrain/README.md); combine with `--self-hosted` to do both in one run. Pass **`--repo-root`** (or set `ROBRAIN_REPO`) when developing in the monorepo; that **replaces** any package-copied bundle with a symlink into your clone (macOS/Linux) or a fresh copy (Windows).
 
 #### From a clone instead (development)
 
@@ -300,7 +300,6 @@ All commands accept `--help` for full flag details. Repo-level `pnpm` scripts li
 | `npx robrain explain <file> --copy` | Copy explain output to the clipboard |
 | `npx robrain rule --add "..."` | Add a Planning rule (**Rory Plans cloud** — requires `planningUrl` in config) |
 | `npx robrain rule --list` | List rules from Planning **`GET /facts`** when cloud is configured; OSS-only prints guidance |
-| `npx robrain rule --remove <id>` | Remove a rule by id (cloud Planning API) |
 | `npx robrain rule --type <type>` | When using **`--add`**, set rule type: **`always_include`**, **`always_exclude`**, or **`preference`** (default: **`preference`**) |
 | `npx robrain status` | Auth + Perception/Planning health + **active decision count** for the current project |
 | `npx robrain logout` | Clear locally stored credentials (Rory Plans token / install state) |

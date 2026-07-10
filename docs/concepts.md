@@ -317,9 +317,9 @@ Claude must acknowledge this before proceeding. The contradiction doesn't silent
 
 #### Pre-task rejection warnings
 
-In Free / self-hosted mode, the default retrieval path is the always-on summary Sensing loads at session start. When you need something narrower than that always-loaded block, you run `npx robrain inject`, paste the result, then work. Cloud supports the same CLI — and adds automatic injection at task boundaries, plus pre-task `rejected[]` warnings the self-hosted path does not surface on its own:
+In Free / self-hosted mode, the default retrieval path is the always-on summary Sensing loads at session start. When you need something narrower than that always-loaded block, you run `npx robrain inject`, paste the result, then work. On Claude Code, the [RoBrain plugin](https://github.com/adelinamart/robrain/tree/main/plugins/claude-code) goes further: its `UserPromptSubmit` hook scans each task against your stored `rejected[]` arrays and fires a warning *before* Claude answers — no command needed. Cloud runs the same behavior across every tool (Cursor, Copilot, Codex) and adds automatic injection at task boundaries.
 
-When Control injects context at a task boundary, it scans the current task description against all stored `rejected[]` arrays. If the task mentions something previously ruled out, a warning fires *before* the agent answers:
+When the plugin hook — or, in cloud, Control — sees a task, it scans the task description against all stored `rejected[]` arrays. If the task mentions something previously ruled out, a warning fires *before* the agent answers:
 
 ```
 ⚠ Previously rejected: GraphQL — latency concerns at scale
@@ -328,7 +328,7 @@ When Control injects context at a task boundary, it scans the current task descr
 
 This happens at the right moment — before the agent has suggested anything — not after. It's the difference between a system that reminds you of the past and one that steers you away from known mistakes before they happen.
 
-Both features run on the `rejected[]` substrate the Free / self-hosted version captures. The vetoes are collected locally — the intelligence that acts on them at task boundaries is in the cloud.
+All of this runs on the `rejected[]` substrate the Free / self-hosted version captures. On Claude Code the plugin hook acts on those vetoes locally, before the agent responds. Cloud extends the same behavior to Cursor, Copilot, and Codex and injects context at task boundaries without a per-prompt hook.
 
 **Get cloud access:** register for Rory Plans cloud early access by filling in [this form](https://docs.google.com/forms/d/e/1FAIpQLSe9c-7a23MvUEzF_yjxzK4RN_sF1VHiMSpPplRcG9GxEvbPhA/viewform?pli=1), or visit [roryplans.ai](https://roryplans.ai).
 
@@ -357,7 +357,7 @@ The self-hosted version already brings decisions back automatically through the 
 | Calibrated extraction prompt (fewer false positives) | — | ✓ |
 | Calibrated 4-way contradiction taxonomy | — | ✓ |
 | Automatic injection at task boundaries | — | ✓ |
-| Pre-task `rejected[]` warning | — | ✓ |
+| Pre-task `rejected[]` warning | ✓ Claude Code plugin | ✓ every tool |
 | Disengagement protocol (⚠ acknowledgement) | — | ✓ |
 | Pre-commit conflict verdict (`/dry-run` structured check) | — | ✓ |
 | Full 5-signal relevance scorer | — | ✓ |
@@ -370,7 +370,7 @@ The self-hosted version already brings decisions back automatically through the 
 
 The honest difference: self-hosted gives you capture, storage, provenance, outcomes feedback, and the always-on summary. When you need focused retrieval beyond that default block, you pull it with `npx robrain inject` (or `explain` / `export` / `outcomes` — all verified against cloud). The cloud adds the intelligence layer — Planning scores what's relevant to your current task and Control injects it automatically at every task boundary, with richer per-injection feedback and team-scoped isolation.
 
-The extraction quality difference is real but secondary. Both versions use Claude Haiku. The cloud version has a more calibrated prompt that reduces false positives — we'll publish numbers once we have real-session benchmark data. The bigger gap is task-boundary targeting and proactive injection vs relying on `inject` yourself — a workflow change, not just an accuracy improvement.
+The extraction quality difference is real but secondary. Both versions use Claude Haiku 4.5 by default (`claude-haiku-4-5`). The cloud version has a more calibrated prompt that reduces false positives — we'll publish numbers once we have real-session benchmark data. The bigger gap is task-boundary targeting and proactive injection vs relying on `inject` yourself — a workflow change, not just an accuracy improvement.
 
 **Get cloud access:** register for Rory Plans cloud early access by filling in [this form](https://docs.google.com/forms/d/e/1FAIpQLSe9c-7a23MvUEzF_yjxzK4RN_sF1VHiMSpPplRcG9GxEvbPhA/viewform?pli=1), or visit [roryplans.ai](https://roryplans.ai).
 
@@ -400,7 +400,7 @@ The two can coexist: Auto memory for lightweight scratch notes; RoBrain for cano
 Your AI agent resets every session.
 Mem0 stores facts. Zep stores entity relationships and conversation history. Neither exposes rejected alternatives as a first-class, structured field you can query — which means your agent can know "we use Zustand" but not "we considered Redux and ruled it out for a specific reason." The veto gets lost in prose or not captured at all.
 
-RoBrain stores each veto in **`rejected[]`** so the judgment layer can act on it: pre-task warnings (cloud Control), semantic inject, contradiction surfacing, and Synthesis clustering — not as an isolated novelty, but as the structured input those features require.
+RoBrain stores each veto in **`rejected[]`** so the judgment layer can act on it: pre-task warnings (Claude Code plugin hook or cloud Control), semantic inject, contradiction surfacing, and Synthesis clustering — not as an isolated novelty, but as the structured input those features require.
 
 We are not aware of another coding agent memory tool with a first-class rejected alternatives field — but we welcome corrections if that's wrong.
 

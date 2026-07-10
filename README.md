@@ -102,7 +102,7 @@ Review what it finds with `npx robrain review`. Deep dive (three passes, cron, e
 
 One cross-tool setup covers **Claude Code, Cursor, GitHub Copilot (VS Code), and Codex CLI** against the same Postgres store. The classifier LLM is your choice — Anthropic Haiku or OpenAI. Decisions carry a lifecycle (active / superseded / invalidated) and a graph (`conflicts_with` / `extends` / `related_to`).
 
-Running [Hermes](https://github.com/NousResearch/hermes-agent)? A standalone memory-provider plugin ships in [integrations/hermes](integrations/hermes/robrain/README.md) — passive capture and veto-aware recall through the same Perception API, installed into `~/.hermes/plugins/`.
+Running [Hermes](https://github.com/NousResearch/hermes-agent)? `npx robrain install --hermes` drops a standalone memory-provider plugin into `~/.hermes/plugins/` — passive capture and veto-aware recall through the same Perception API. Docs: [integrations/hermes](integrations/hermes/robrain/README.md).
 
 Decision ledger for git (opt-in):
 

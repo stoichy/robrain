@@ -4,9 +4,31 @@ How RoBrain works, the capture + judgment pillars, Synthesis, comparisons, and r
 
 [← Back to README](https://github.com/adelinamart/robrain)
 
-Most agent-memory tools stop at capture — they store what happened and hope you query it later. RoBrain is built around a different question: **what is worth keeping, and what should surface before the agent acts again?** Passive capture records every decision and the alternatives your team ruled out; batch **Synthesis** reads the whole corpus to flag contradictions, drift, and recurring entities that no single session could see.
+Most agent-memory tools stop at capture—they log history and leave it to rot. RoBrain is built around a harder question: **Is this context still true against the live environment, and what must surface before an agent acts again?** While passive capture structures active decisions and rejected alternatives, batch **Synthesis** acts as a cross-corpus judgment layer to flag systemic drift, contradictions, and silent reversals that reactive single-session writes completely miss.
 
 > The cost of forgetting a rejection isn't inefficiency. It's the auth bypass you already patched, the migration you already rolled back, the dependency you already removed for a CVE — re-suggested by an agent with no memory of why you said no.
+
+## The memory landscape at a glance (July 2026)
+
+Every memory product answers *"what did we store?"* RoBrain is built around four harder questions: **worth keeping? still true? actually worked? worth attention right now?** Here is the landscape against those questions:
+
+| Product (what it stores) | Capture | Rejected options as data | Worth keeping? | Still true? | Actually worked? | Attention now? | Team & cross-tool | Fully local |
+|---|---|---|---|---|---|---|---|---|
+| **RoBrain OSS** (structured decisions: rationale, files, `rejected[]`, provenance) | Deterministic via plugin hooks (every turn shipped) + MCP for other editors | ✅ **first-class, queryable** | ✅ classifier + confidence floor + human review queue, per-memory provenance | ✅ contradiction scan + drift detection + supersession lifecycle — old decisions stay queryable | ✅ git-revert outcomes scan + used/ignored counters with auto-demotion + VetoBench CI gates | ✅ always-on summary at session start **+ pre-task warnings** (`POST /veto-scan` + Claude Code plugin / Hermes provider) | ✅ shared Postgres across Claude Code, Cursor, Copilot, Codex, Hermes | ✅ Ollama/LM Studio/vLLM mode + secrets redaction at ingest |
+| **RoBrain Cloud** (Rory Plans — same store, managed) | Same, calibrated extraction prompt | ✅ + auto-propagated vetoes (supersessions inherit rejection history) | ✅ + helpful/pushback feedback per injection | ✅ + write-time supersession detection + contradiction taxonomy + guard-railed auto-resolution + lineage timeline | ✅ same outcome loop + full 5-signal relevance scorer | ✅ automatic injection at task boundaries, blocking ⚠ acknowledgement protocol, pre-commit `/dry-run` conflict verdict | ✅ org isolation — API keys, roles, scoped access | — processed remotely |
+| **Claude Code** (CLAUDE.md + auto memory markdown) | You write / model chooses to save | ❌ prose at best | Model discretion; you edit after the fact | ❌ edits overwrite; conflicting rules picked arbitrarily | ❌ | Unranked file load at session start | CLAUDE.md via git (human-written); auto memory machine-local, per-tool | Files local, bound to Claude Code + Anthropic |
+| **claude.ai memory** (profile summary) | Auto-synthesized from chats | ❌ | Opaque heuristic; edit/delete after | Periodic silent re-summary | ❌ | Injected into new chats, no task ranking | ❌ per-user | ❌ hosted |
+| **Anthropic platform** (API memory tool files; memory stores, beta) | Model-driven file writes | ❌ | Model discretion; store CRUD enables DIY review | Dreams consolidation (research preview, resolves toward newest); store versions pruned ~30 days | ❌ patterns from transcripts, no code ground truth | Pull — agent must check `/memories`; stores mounted with a prompt note | Memory stores shareable (hosted beta) | Memory-tool backend is yours; stores/Dreams hosted |
+| **ChatGPT memory** (self-rewriting profile + project memories) | Fully automatic background synthesis ("Dreaming V3", Jun 2026) | ❌ | Opaque; delete-and-turn-off control | Time-aware self-rewrites — but silent overwrite, limited audit trail, no queryable history | ❌ | Silent injection, no control | Project-scoped memory, 90-day retention (Team/Enterprise, Jul 2026) — partitioned, not a shared team brain | ❌ |
+| **Mem0** (fact vectors + built-in entity linking; external graph stores dropped from OSS) | Your app calls add/search APIs | ❌ | LLM dedup on write; no human gate | Updates overwrite/merge; expiration + temporal filters | ❌ | Pull via search API; you wire injection | Hosted orgs; OSS is DIY; OpenMemory import/export | ✅ |
+| **Zep / Graphiti** (temporal knowledge graph) | Async ingestion of conversations | ❌ — tracks facts that *changed*, not options *never adopted* | Automatic extraction; no review gate | ✅ strong — bi-temporal validity, fact invalidation | ❌ | Pull via search/graph queries | Hosted multi-user; Graphiti OSS is DIY | ✅ Graphiti |
+| **Letta** (agent-edited memory blocks) | Agent self-edits, visible trail | ❌ | Agent's own discretion | Sleep-time consolidation (moving to client-side subagents) | ❌ | Core blocks always in context; archival on pull | Blocks shareable across agents; not editor-cross-tool | ✅ |
+| **claude-mem** (compressed observations of every tool call, local SQLite) | Passive hooks on every tool invocation | ❌ observations, not decisions | AI compression, no gate | ❌ | ❌ | Injects prior-session summaries at start | Cross-tool (Claude Code, Codex, Gemini, Copilot…) but single-user, no team store | ✅ |
+| **Neo4j context graph** (entity knowledge graph + reasoning traces; Labs, experimental) | App API calls / agent-discretionary MCP tools | ❌ traces record actions taken, not options refused — *an action log has no "no"* | Entity dedup only | Append-oriented; no supersession or contradiction pass | Run outcomes logged; nothing rescores memory | Pull only; no automatic session-start injection | ✅ multi-agent shared graph — self-host or hosted service | ✅ self-host Neo4j |
+
+> Others give your agent more to read. RoBrain gives it a **judged memory** — what we decided, what we refused, what still holds, and what actually worked — and hands the refusals back right before they're about to happen again.
+
+*Competitor cells reflect public docs and changelogs as of July 2026. Corrections welcome — open an issue or PR.*
 
 ## How it works
 
@@ -45,7 +67,7 @@ Coding is the first vertical because the feedback loops are tight — reverts, i
 
 Memory alone lets you ask *"what did we decide in March?"* Judgment answers harder questions: *are we contradicting ourselves? did our stance drift without anyone noticing? is the agent about to re-litigate something we already ruled out?*
 
-- **Contradiction-catching** — Perception flags conflicts when a new decision collides with an old one. **Synthesis** scans the full corpus for incompatible pairs the reactive path never linked (different files, different sessions, different vocabulary). Rory Plans cloud surfaces conflicts and `rejected[]` vetoes at task boundaries before the agent suggests code.
+- **Contradiction-catching** — **Synthesis** scans the full corpus for incompatible pairs the write path never linked (different files, different sessions, different vocabulary); the write path itself dedups near-duplicates. Rory Plans cloud adds write-time reversal detection and surfaces conflicts and `rejected[]` vetoes at task boundaries before the agent suggests code.
 - **Synthesis as the judgment layer** — drift detection, contradiction passes, and entity promotion turn hundreds of isolated rows into `planning_blocks`, relation edges, and `robrain review` queues. See [Synthesis](#synthesis) below.
 - **`rejected[]` as substrate** — structured vetoes are the input pre-task warnings need. Capture stores them; judgment (retrieval, Synthesis, Control) acts on them.
 
@@ -94,7 +116,7 @@ With this set, **no `ANTHROPIC_API_KEY` is required** — Perception, Sensing, a
 
 ### How RoBrain compares
 
-After you've seen the loop, you may want to know how RoBrain fits the broader landscape of AI memory tools. The short version:
+The full product-by-product breakdown is in [the landscape table at the top of this page](#the-memory-landscape-at-a-glance-july-2026). The short version:
 
 - **Claude Code Auto-Memory** captures per-user, per-machine. Bob's machine has no idea what Alice's machine learned.
 - **Mem0** stores facts and resolves contradictions at the moment of insertion. It doesn't periodically scan the whole corpus for contradictions that emerge later.
@@ -118,10 +140,10 @@ Why isn't retrieval just another MCP tool? You usually don't need to run anythin
 | Path | `npx robrain export-memory` | Always-on summary | Synthesis (`compiled_truth`) |
 |---|---|---|---|
 | How it runs | **Manual** — `npx robrain export-memory`, or chained from Synthesis when `SYNTHESIS_EXPORT_MEMORY=true` | **Automatic** — Sensing fetches it every `sensing_start_session` | **Batch** — `npx robrain synth` / `pnpm synthesis:run` on demand, or nightly cron |
-| What it is | The archive — vetted decisions written to disk so Claude can read them on its own | The "good morning" briefing — a short ranked digest handed to the agent at session start | The **dreaming** step — cross-corpus consolidation that runs while no one is looking, looking for drift, contradictions, and recurring entities |
+| What it is | The archive — vetted decisions written to disk so Claude can read them on its own | The "good morning" briefing — a short ranked digest handed to the agent at session start | The **overnight audit** — a cross-corpus pass that runs while no one is looking, hunting drift, contradictions, and recurring entities |
 | What it pulls from decisions | All approved active rows (no cap); `--include-unreviewed` widens | <=20 active rows: <=15 **high-signal** (approved OR has `rejected[]` OR scope=`global`) + <=5 **recency fill** | All active rows are clustered by topic; the `compiled_truth` sentence is built from **approved rows only** in each cluster |
 | Where the output lives | Markdown files in `~/.claude/projects/<slug>/memory/` (+ managed block in `MEMORY.md`); optional **`--ledger`** → `<project>/decisions.md` (git-committed, regenerated) | `projects.always_on_summary` text column in Postgres | `planning_blocks` rows in Postgres — one pre-compressed sentence per topic |
-| How it reaches Claude | Claude Code's own auto-memory loader reads the files on every session; **`decisions.md`** is for humans and git — not loaded by Claude automatically | Returned as the `sensing_start_session` tool result — the agent sees it as a tool response | Stays in Postgres — needs **`export-memory`** (or cloud Control) to surface to Claude. **Synthesis without export = a dream nobody remembers.** |
+| How it reaches Claude | Claude Code's own auto-memory loader reads the files on every session; **`decisions.md`** is for humans and git — not loaded by Claude automatically | Returned as the `sensing_start_session` tool result — the agent sees it as a tool response | Stays in Postgres — needs **`export-memory`** (or cloud Control) to surface to Claude. **Synthesis without export = an audit nobody reads.** |
 | Why it matters | Survives Perception outages; gives Claude the full vetted corpus, file-clustered | Zero-effort context at the start of every session, even before the agent does anything | Catches the contradictions, drift, and recurring entities the reactive write path can't see in isolation |
 
 </details>
@@ -130,7 +152,7 @@ Why isn't retrieval just another MCP tool? You usually don't need to run anythin
 
 | Pillar | When it runs | What it does |
 |--------|----------------|--------------|
-| **Capture** | Every session (Sensing → Perception) | Extracts decisions + `rejected[]`; flags conflicts at write time; fills the always-on summary |
+| **Capture** | Every session (Sensing → Perception) | Extracts decisions + `rejected[]`; dedups near-duplicates at write time (cloud adds write-time reversal detection); fills the always-on summary |
 | **Judgment** | On demand or on a schedule (Synthesis + review) | Reads the **whole** corpus — drift, cross-session contradictions, entity promotion |
 
 Capture without judgment leaves contradictions buried in hundreds of rows. Judgment without capture has nothing to judge. RoBrain ships both.
@@ -317,7 +339,7 @@ Claude must acknowledge this before proceeding. The contradiction doesn't silent
 
 #### Pre-task rejection warnings
 
-In Free / self-hosted mode, the default retrieval path is the always-on summary Sensing loads at session start. When you need something narrower than that always-loaded block, you run `npx robrain inject`, paste the result, then work. On Claude Code, the [RoBrain plugin](https://github.com/adelinamart/robrain/tree/main/plugins/claude-code) goes further: its `UserPromptSubmit` hook scans each task against your stored `rejected[]` arrays and fires a warning *before* Claude answers — no command needed. Cloud runs the same behavior across every tool (Cursor, Copilot, Codex) and adds automatic injection at task boundaries.
+In Free / self-hosted mode, the default retrieval path is the always-on summary Sensing loads at session start. When you need something narrower than that always-loaded block, you run `npx robrain inject`, paste the result, then work. On Claude Code, the [RoBrain plugin](https://github.com/adelinamart/robrain/tree/main/plugins/claude-code) goes further: its `UserPromptSubmit` hook calls `POST /veto-scan` for deterministic exact matches, then semantic search for longer prompts — a warning fires *before* Claude answers. Cloud runs task-boundary injection across every tool and adds pre-commit `/dry-run`.
 
 When the plugin hook — or, in cloud, Control — sees a task, it scans the task description against all stored `rejected[]` arrays. If the task mentions something previously ruled out, a warning fires *before* the agent answers:
 
@@ -328,7 +350,38 @@ When the plugin hook — or, in cloud, Control — sees a task, it scans the tas
 
 This happens at the right moment — before the agent has suggested anything — not after. It's the difference between a system that reminds you of the past and one that steers you away from known mistakes before they happen.
 
-All of this runs on the `rejected[]` substrate the Free / self-hosted version captures. On Claude Code the plugin hook acts on those vetoes locally, before the agent responds. Cloud extends the same behavior to Cursor, Copilot, and Codex and injects context at task boundaries without a per-prompt hook.
+All of this runs on the `rejected[]` substrate the Free / self-hosted version captures. On Claude Code the plugin hook acts on those vetoes locally, before the agent responds. Hermes does the same via semantic prefetch (`REJECTED:` warnings per turn). Cloud extends task-boundary injection to Cursor, Copilot, and Codex without a per-prompt hook.
+
+#### `POST /veto-scan` — deterministic tier (self-hosted Perception)
+
+Self-hosted Perception exposes a fast endpoint for hooks and integrations — the **zero-embedding tier** of the pre-task check:
+
+```http
+POST /veto-scan
+Authorization: Bearer $PERCEPTION_API_KEY
+Content-Type: application/json
+
+{ "project_id": "<id>", "text": "<prompt or task text>" }
+```
+
+```json
+{
+  "matches": [
+    {
+      "id": "…",
+      "decision": "Use pgvector in Postgres",
+      "rejected": [{ "option": "Pinecone", "reason": "per-namespace pricing" }],
+      "reviewed": true
+    }
+  ]
+}
+```
+
+SQL pre-filters active decisions whose `rejected[].option` appears in the text; the shared word-boundary matcher (`@robrain/shared`) verifies the hit (so `pineconeish` does not match `Pinecone`). No embedding call, no LLM — cheap enough to call on every prompt.
+
+The [Claude Code plugin](../plugins/claude-code/README.md) calls this on `UserPromptSubmit` as **tier 1**, then runs semantic `GET /decisions?query=` as **tier 2** for longer prompts.
+
+**Not the same as cloud pre-commit `/dry-run`:** that is a structured write-time conflict verdict on Rory Plans cloud. `POST /veto-scan` is the OSS pre-action check for literal rejected-option mentions.
 
 **Get cloud access:** register for Rory Plans cloud early access by filling in [this form](https://docs.google.com/forms/d/e/1FAIpQLSe9c-7a23MvUEzF_yjxzK4RN_sF1VHiMSpPplRcG9GxEvbPhA/viewform?pli=1), or visit [roryplans.ai](https://roryplans.ai).
 
@@ -339,7 +392,7 @@ The self-hosted version already brings decisions back automatically through the 
 | Passive session capture | ✓ | ✓ |
 | `rejected[]` field as structured data | ✓ | ✓ |
 | Decision lifecycle (active / superseded / invalidated) | ✓ | ✓ |
-| Cross-tool MCP — Claude Code, Cursor, Copilot, Codex CLI | ✓ | ✓ |
+| Cross-tool MCP — Claude Code, Cursor, Copilot, Codex CLI, Hermes | ✓ | ✓ |
 | Classifier LLM choice — Anthropic Haiku or OpenAI | ✓ | ✓ |
 | Always-on summary at session start | ✓ | ✓ |
 | `npx robrain review` / `inject` / `explain` / `export-memory` | ✓ | ✓ |
@@ -357,7 +410,8 @@ The self-hosted version already brings decisions back automatically through the 
 | Calibrated extraction prompt (fewer false positives) | — | ✓ |
 | Calibrated 4-way contradiction taxonomy | — | ✓ |
 | Automatic injection at task boundaries | — | ✓ |
-| Pre-task `rejected[]` warning | ✓ Claude Code plugin | ✓ every tool |
+| Deterministic veto scan (`POST /veto-scan` — exact rejected-option match) | ✓ | — |
+| Pre-task `rejected[]` warning | ✓ Claude Code plugin + Hermes provider | ✓ every tool |
 | Disengagement protocol (⚠ acknowledgement) | — | ✓ |
 | Pre-commit conflict verdict (`/dry-run` structured check) | — | ✓ |
 | Full 5-signal relevance scorer | — | ✓ |
@@ -412,21 +466,24 @@ RoBrain tracks decision state over time. When you switch from Zustand to Jotai t
 
 ```json
 {
+  "id": "dec_zustand_0315",
   "decision": "Use Zustand for state management",
-  "status": "superseded",
-  "superseded_by": "abc123",
-  "created_at": "2024-03-15"
+  "created_at": "2024-03-15",
+  "invalidated_at": "2024-09-02"
 }
 
 {
+  "id": "dec_jotai_0902",
   "decision": "Use Jotai for state management",
   "rationale": "Zustand caused issues at scale with 50+ stores",
   "rejected": [{ "option": "Zustand", "reason": "scaling issues with 50+ stores" }],
-  "status": "active",
-  "supersedes": "xyz789",
-  "created_at": "2024-09-02"
+  "supersedes_id": "dec_zustand_0315",
+  "created_at": "2024-09-02",
+  "invalidated_at": null
 }
 ```
+
+(These are the real columns: `invalidated_at IS NULL` means active, a set timestamp means superseded or retired — rows are never deleted. `supersedes_id` links the replacement to what it replaced, and richer edges live in `decision_relations`.)
 
 The full timeline is always queryable. You can ask "what was the state management decision in March?" and get an accurate answer. You can see the full chain of decisions and why each one changed.
 
@@ -434,7 +491,7 @@ The full timeline is always queryable. You can ask "what was the state managemen
 
 Markdown lies over time. A CLAUDE.md file that says "we use Zustand" is accurate until it isn't, and there's no signal when it becomes false. RoBrain becomes living memory — decisions have a state, a history, and a reason for changing. The agent injecting context from RoBrain knows whether a decision is currently active or was superseded, and why.
 
-This lifecycle tracking happens automatically. When Sensing detects a new decision that contradicts an existing one, Perception flags it and links the two. When you confirm the change via `npx robrain review`, the old decision is invalidated. Nothing is ever deleted — history is always preserved.
+This lifecycle tracking happens automatically. When a later decision contradicts an earlier one, the Synthesis contradiction scan links the pair (cloud also detects reversals at write time). When you confirm the change via `npx robrain review`, the old decision is invalidated. Nothing is ever deleted — history is always preserved.
 
 ### Why CLAUDE.md isn't enough — and when it is
 

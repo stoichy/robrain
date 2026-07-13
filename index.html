@@ -595,6 +595,31 @@
         margin-top: 1.25rem;
       }
 
+      .feature-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .feature-list li {
+        margin: 0 0 1rem;
+        padding: 0 0 1rem;
+        border-bottom: 1px solid var(--violet-200);
+      }
+
+      .feature-list li:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+      }
+
+      .feature-list li strong {
+        display: block;
+        color: var(--violet-950);
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+      }
+
       .qualify-list {
         margin: 0;
         padding-left: 1.2rem;
@@ -656,7 +681,7 @@
           <div class="hero-copy">
             <span class="badge">Open-source · cloud option</span>
             <h1>RoBrain</h1>
-            <p class="lead">Shared memory across your team and your AI agents — with judgment about what's worth keeping.</p>
+            <p class="lead">Shared memory across your team and your AI agents — with judgment!</p>
             <p class="hero-thesis">
               RoBrain isn't just another memory layer — it's the brain that helps you and your agents make better
               decisions and avoid costly mistakes.
@@ -691,8 +716,8 @@
 
       <section class="card">
         <p>
-          Most agent-memory tools stop at capture — they store what happened and hope you query it later. RoBrain is
-          built around a different question: <strong>what is worth keeping, and what should surface before the agent acts again?</strong>
+          Most agent-memory tools treat context like a passive archive. RoBrain is an evaluation and delivery engine designed around state-grounding:
+        <strong> Is this context still true against the live environment, and what must surface before an agent acts again?</strong>
           Passive capture records every decision and the alternatives your team ruled out; batch <strong>Synthesis</strong>
           reads the whole corpus to flag contradictions, drift, and recurring entities that no single session could see.
           Coding is the first vertical because the feedback loops are tight — reverts, incidents, and rework make the
@@ -712,6 +737,30 @@
         </blockquote>
       </section>
 
+      <section class="card">
+        <h2 id="how-to-use"><span class="icon">→</span> How to use RoBrain?</h2>
+        <p><strong>Two commands, no clone needed:</strong></p>
+        <pre><code>export ANTHROPIC_API_KEY=... OPENAI_API_KEY=...   # classifier + embedding keys (or add to ~/.robrain/stack/.env after first run)
+npx robrain@latest up                             # start the backend (Postgres + Perception) in Docker
+npx robrain install --self-hosted                 # wire the MCP server into your editors</code></pre>
+        <p>
+          Then run <code>npx robrain init-project</code> inside any repo you want memory for. Capture is automatic from
+          there — every session turn is classified, no tagging. If captures don't land,
+          <code>npx robrain doctor</code> diagnoses the setup.
+        </p>
+        <p>
+          Claude Code users should also install the plugin, which adds deterministic hook-based capture and pre-task
+          warnings about rejected approaches:
+        </p>
+        <pre><code>claude plugin marketplace add adelinamart/robrain
+claude plugin install robrain@robrain</code></pre>
+        <p class="figure-caption" style="margin-top: 1rem">
+          Clone path, Synthesis, ledger export, and troubleshooting:
+          <a href="#quick-start">Quick start</a> ·
+          <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md">CLI reference</a>
+        </p>
+      </section>
+
       <p class="section-bridge">Whether that's worth the setup depends on your situation.</p>
 
       <section class="card">
@@ -729,83 +778,78 @@
       </section>
 
       <p class="section-bridge">
-        If they do, here's how RoBrain compares to the obvious alternatives.
+        If they do, here's what RoBrain offers.
       </p>
 
       <section class="card">
-        <h2 id="product-comparison"><span class="icon">⊞</span> What RoBrain does that others don't</h2>
-        <div class="table-wrap table-wrap--matrix" role="region" aria-labelledby="product-comparison">
-          <table class="compare-matrix">
-            <thead>
-              <tr>
-                <th scope="col">Feature</th>
-                <th scope="col">RoBrain</th>
-                <th scope="col">Mem0</th>
-                <th scope="col">Cloudflare Agent Memory</th>
-                <th scope="col">Claude Code Auto-Memory</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">Tracks what your team ruled out</th>
-                <td>Yes — structured <code>rejected[]</code> field per decision</td>
-                <td class="muted">No</td>
-                <td class="muted">No</td>
-                <td class="muted">No</td>
-              </tr>
-              <tr>
-                <th scope="row">Catches when a new decision contradicts an old one</th>
-                <td>Yes — scheduled scan across the whole project (Synthesis)</td>
-                <td class="muted">No — only at the moment of insertion, no scheduled corpus scan</td>
-                <td class="muted">Partial — internal use only</td>
-                <td>Yes — <strong>silently deletes the loser</strong></td>
-              </tr>
-              <tr>
-                <th scope="row">Past decisions stay queryable after you change your mind</th>
-                <td>Yes — old and new both kept</td>
-                <td class="muted">No — new replaces old</td>
-                <td class="muted">No</td>
-                <td class="muted">No</td>
-              </tr>
-              <tr>
-                <th scope="row">Shared memory across your team</th>
-                <td>Yes — one Postgres for the whole team</td>
-                <td class="muted">Partial — via scoping workaround</td>
-                <td>Yes — managed profiles</td>
-                <td class="muted">No — per-user, per-machine</td>
-              </tr>
-              <tr>
-                <th scope="row">Works across Claude Code, Cursor, Copilot, and Codex CLI</th>
-                <td>Yes</td>
-                <td>Yes</td>
-                <td>Yes</td>
-                <td class="muted">No — Claude Code only</td>
-              </tr>
-              <tr>
-                <th scope="row">Open source, self-hosted</th>
-                <td>Yes — Apache 2.0, your Postgres</td>
-                <td class="muted">Partial — graph features paywalled</td>
-                <td class="muted">No — managed only</td>
-                <td>N/A — markdown files locally</td>
-              </tr>
-              <tr>
-                <th scope="row">Warns the agent before it suggests something you ruled out</th>
-                <td>Cloud: yes, automatic.<br>Self-hosted: yes — automatic in Claude Code via the plugin, or via <code>inject</code>.</td>
-                <td class="muted">No</td>
-                <td class="muted">No</td>
-                <td class="muted">No</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="matrix-callout">
-          <strong>Why structured lifecycle matters:</strong> Claude Code Auto-Memory can flag contradictions — but
-          <strong>silently deletes the loser</strong>. RoBrain keeps both sides queryable so teams revisit reversals
-          intentionally.
+        <h2 id="top-features"><span class="icon">★</span> Top features</h2>
+        <ul class="feature-list">
+          <li>
+            <strong>Rejected alternatives as first-class data</strong>
+            Every decision can carry a structured <code>rejected[]</code> field: what was ruled out, and why.
+          </li>
+          <li>
+            <strong>Pre-task veto warnings</strong>
+            Self-hosted Perception exposes <code>POST /veto-scan</code> for deterministic exact-match on
+            <code>rejected[]</code> (no LLM). The Claude Code plugin calls it on every prompt, then semantic search for
+            longer tasks; Hermes renders semantic <code>REJECTED:</code> warnings per turn. Other editors get prior
+            decisions at session start via the always-on summary.
+          </li>
+          <li>
+            <strong>Passive capture</strong>
+            Decisions are extracted from your sessions automatically; nobody tags anything.
+          </li>
+          <li>
+            <strong>Cross-tool memory</strong>
+            One Postgres store shared by Claude Code, Cursor, GitHub Copilot, Codex CLI, and Hermes; decide in one tool, remembered in all.
+          </li>
+          <li>
+            <strong>Judgment, not just storage</strong>
+            Synthesis passes (run manually or on your cron) flag contradictions and stance drift across the whole corpus; decisions carry a lifecycle (active / superseded / invalidated) and a graph (<code>conflicts_with</code> / <code>extends</code> / <code>related_to</code>).
+          </li>
+          <li>
+            <strong>Git-grounded feedback</strong>
+            <code>robrain outcomes</code> demotes decisions that led to reverts; incidents are next on the roadmap.
+          </li>
+          <li>
+            <strong>Private by default</strong>
+            API-key auth on every request, secrets scrubbed at capture and again at ingest, and a fully-local mode running extraction and embeddings on Ollama, LM Studio, or vLLM.
+          </li>
+          <li>
+            <strong>No lock-in</strong>
+            Export the whole corpus as <code>robrain-memory/v1</code> JSONL, or keep a decision ledger in git with <code>robrain export-memory --ledger</code>.
+          </li>
+          <li>
+            <strong>Fully self-hosted</strong>
+            Your data stays on your infrastructure; Apache-2.0.
+          </li>
+        </ul>
+        <p class="figure-caption" style="margin-top: 1rem">
+          Comparisons with other memory tools:
+          <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#comparisons">Concepts — Comparisons</a>.
         </p>
-        <p class="figure-caption">
-          More detail and tradeoffs: <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md#comparisons">Concepts — Comparisons</a>.
-        </p>
+      </section>
+
+      <section class="card">
+        <h2 id="use-cases"><span class="icon">◎</span> Use cases</h2>
+        <ul class="feature-list">
+          <li>
+            <strong>Stop repeated mistakes</strong>
+            The dependency you removed for a CVE, the vendor you dropped over pricing, the migration you rolled back — surfaced with the original reasoning right when an agent is about to suggest them again.
+          </li>
+          <li>
+            <strong>Team handoffs</strong>
+            A decision made in Cursor on Tuesday is known to a teammate's Claude Code on Wednesday.
+          </li>
+          <li>
+            <strong>Onboarding</strong>
+            New engineers (and their agents) inherit the project's decision history instead of relearning it.
+          </li>
+          <li>
+            <strong>Decision archaeology</strong>
+            <code>npx robrain explain &lt;file&gt;</code> answers "why does this code look this way?"
+          </li>
+        </ul>
       </section>
 
       <section class="card">
@@ -900,6 +944,15 @@
           </p>
         </div>
         <div class="arch-block">
+          <h3>What runs before each prompt (OSS)</h3>
+          <p>
+            <strong><code>POST /veto-scan</code></strong> on self-hosted Perception — deterministic check: does this
+            text literally name an option an active decision rejected? No embedding, no LLM. The Claude Code plugin calls
+            it on every <code>UserPromptSubmit</code> (tier 1), then semantic search for longer prompts (tier 2).
+            Hermes uses semantic prefetch for <code>REJECTED:</code> warnings per turn.
+          </p>
+        </div>
+        <div class="arch-block">
           <h3>What runs on a schedule</h3>
           <p>
             <strong>Synthesis</strong> is the batch job: run <code>npx robrain synth</code> on demand or on a cron
@@ -910,21 +963,22 @@
           <h3>Cloud-only extras</h3>
           <p>
             <strong>Planning API</strong> and <strong>Control MCP</strong> add a 5-signal relevance scorer, automatic
-            injection at task boundaries, pre-task rejection warnings across every editor (self-hosted gets them in
-            Claude Code via the plugin), and a pre-commit conflict verdict on
-            <strong>Rory Plans cloud</strong> — full breakdown below.
+            injection at task boundaries across every editor, and a pre-commit <code>/dry-run</code> conflict verdict —
+            distinct from OSS <code>POST /veto-scan</code>, which is the deterministic pre-action check for literal
+            rejected-option mentions. Full breakdown below.
           </p>
         </div>
       </section>
 
       <p class="section-bridge">
-        Convinced? Fastest path is clone-free with <code>robrain up</code>; clone flow is still available for development.
+        More setup paths, Synthesis, and the git ledger — or jump to the <a href="#quick-start">Quick start</a> section below.
       </p>
 
-      <section class="card">
+      <section class="card" id="quick-start">
         <h2><span class="icon">⚡</span> Quick start</h2>
         <p class="final-cta-intro">
-          Clone-free setup: bring your API keys, then run <code>robrain up</code> to start Postgres + Perception from GHCR.
+          The <a href="#how-to-use">steps above</a> are enough to get going. Below: OpenAI-only keys, the clone
+          development path, Synthesis, and the git ledger.
         </p>
         <p class="code-label">One-time — no clone needed</p>
         <pre><code>export ANTHROPIC_API_KEY=... OPENAI_API_KEY=...
@@ -1084,16 +1138,18 @@ hermes memory setup    # select "robrain"</code></pre>
             <tbody>
               <tr><th scope="row">Passive session capture + structured <code>rejected[]</code></th><td>✓</td><td>✓</td></tr>
               <tr><th scope="row">Decision lifecycle (active / superseded / invalidated) + graph</th><td>✓</td><td>✓</td></tr>
-              <tr><th scope="row">Cross-tool MCP — Claude Code, Cursor, Copilot, Codex CLI</th><td>✓</td><td>✓</td></tr>
+              <tr><th scope="row">Cross-tool MCP — Claude Code, Cursor, Copilot, Codex CLI, Hermes</th><td>✓</td><td>✓</td></tr>
               <tr><th scope="row">Always-on summary at session start</th><td>✓</td><td>✓</td></tr>
               <tr><th scope="row">Synthesis — drift, contradictions, entity promotion</th><td>✓</td><td>✓</td></tr>
               <tr><th scope="row">Provenance on every memory + secrets redaction</th><td>✓</td><td>✓</td></tr>
               <tr><th scope="row">Outcome linking — git reverts feed memory rank</th><td>✓</td><td>✓ richer signal</td></tr>
+              <tr><th scope="row">Memory quality feedback — used/ignored counters, auto-demotion</th><td>✓</td><td>✓ + helpful/pushback per injection</td></tr>
               <tr><th scope="row">Memory interchange export + VetoBench CI gates</th><td>✓</td><td>same scorer</td></tr>
               <tr><th scope="row">Self-host on your own infrastructure — data stays local</th><td>✓</td><td class="muted">processed remotely</td></tr>
               <tr><th scope="row">Fully-local mode — LLM + embeddings on Ollama / LM Studio / vLLM</th><td>✓</td><td class="muted">—</td></tr>
               <tr><th scope="row">Automatic injection at task boundaries</th><td class="muted">manual <code>inject</code></td><td>✓</td></tr>
-              <tr><th scope="row">Pre-task <code>rejected[]</code> warning before the agent acts</th><td class="muted">Claude Code only, via plugin</td><td>✓ everywhere</td></tr>
+              <tr><th scope="row">Deterministic veto scan (<code>POST /veto-scan</code>)</th><td>✓</td><td class="muted">—</td></tr>
+              <tr><th scope="row">Pre-task <code>rejected[]</code> warning before the agent acts</th><td class="muted">Claude Code (plugin) and Hermes (provider)</td><td>✓ everywhere</td></tr>
               <tr><th scope="row">Pre-commit conflict verdict (<code>/dry-run</code>)</th><td class="muted">—</td><td>✓</td></tr>
               <tr><th scope="row">Full 5-signal relevance scorer + calibrated extraction</th><td class="muted">—</td><td>✓</td></tr>
               <tr><th scope="row">Auto-propagated vetoes + write-time supersession detection</th><td class="muted">—</td><td>✓</td></tr>
@@ -1125,25 +1181,25 @@ hermes memory setup    # select "robrain"</code></pre>
         </p>
         <ul style="margin: 0.75rem 0 0; padding-left: 1.25rem; color: var(--violet-900)">
           <li style="margin-bottom: 0.45rem">
-            <a href="https://github.com/adelinamart/robrain/tree/main/packages/vetobench">packages/vetobench</a> — benchmark receipts for rejected-approach re-proposals
+            <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md">docs/concepts.md</a> — how it works, two pillars, Synthesis, comparisons
           </li>
           <li style="margin-bottom: 0.45rem">
-            <a href="https://github.com/adelinamart/robrain/blob/main/docs/concepts.md">docs/concepts.md</a> — pillars, Synthesis, comparisons
+            <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md">docs/cli.md</a> — install, upgrading, editor setup, full command table (<code>explain</code>, etc.)
           </li>
           <li style="margin-bottom: 0.45rem">
-            <a href="https://github.com/adelinamart/robrain/blob/main/docs/cli.md">docs/cli.md</a> — install, commands, <code>explain</code>
+            <a href="https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md">docs/troubleshooting.md</a> — silent 401s, Docker rebuilds, stale summaries
           </li>
           <li style="margin-bottom: 0.45rem">
-            <a href="https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md">docs/troubleshooting.md</a> — 401s, Docker, verification
+            <a href="https://github.com/adelinamart/robrain/blob/main/docs/memory-interchange.md">docs/memory-interchange.md</a> — <code>robrain export</code>, <code>robrain-memory/v1</code> JSONL
+          </li>
+          <li style="margin-bottom: 0.45rem">
+            <a href="https://github.com/adelinamart/robrain/tree/main/packages/vetobench">packages/vetobench</a> — does memory stop rejected re-proposals? methodology + archived receipts
           </li>
           <li style="margin-bottom: 0.45rem">
             <a href="https://github.com/adelinamart/robrain/tree/main/plugins/claude-code">plugins/claude-code</a> — hook-based capture + veto warnings
           </li>
-          <li style="margin-bottom: 0.45rem">
-            <a href="https://github.com/adelinamart/robrain/blob/main/integrations/hermes/robrain/README.md">integrations/hermes</a> — Hermes memory-provider plugin
-          </li>
           <li>
-            <a href="https://github.com/adelinamart/robrain/blob/main/docs/memory-interchange.md">docs/memory-interchange.md</a> — <code>robrain-memory/v1</code> JSONL export format
+            <a href="https://github.com/adelinamart/robrain/blob/main/integrations/hermes/robrain/README.md">integrations/hermes/robrain</a> — Hermes memory-provider plugin (capture + veto warnings)
           </li>
         </ul>
       </section>
@@ -1151,14 +1207,14 @@ hermes memory setup    # select "robrain"</code></pre>
       <section class="card" id="privacy">
         <h2><span class="icon">⌂</span> Trust &amp; privacy</h2>
         <p>
-          <strong>Your conversation turns never leave your machine.</strong> The Perception API runs locally in
+          The Perception API runs locally in
           Docker, extraction happens on your hardware, and decisions are stored in your Postgres. Nothing is sent to
           Rory Plans or any other external service.
         </p>
         <p>
-          The <strong>one network dependency</strong>: extraction calls Anthropic’s Haiku API (you provide
-          <code>ANTHROPIC_API_KEY</code>) and embeddings call OpenAI, Voyage, or Cohere. Those are the only outbound
-          calls. You can swap providers or run a local model if you want full air-gapping.
+          The <strong>one network dependency</strong>: extraction calls Anthropic or OpenAI (your choice of
+          classifier) and embeddings call OpenAI, Voyage, or Cohere. Those are the only outbound calls. You can swap
+          providers or run a local model if you want full air-gapping.
         </p>
         <p class="trust-bridge">And here's exactly what gets stored:</p>
         <div class="grid-2" style="margin-top: 0.35rem">
@@ -1173,7 +1229,7 @@ hermes memory setup    # select "robrain"</code></pre>
           <div class="mini-card">
             <h3>Not captured</h3>
             <ul>
-              <li>Your source code or file contents</li>
+              <li>Full file contents are never ingested; decisions store file paths and short turn excerpts, with secrets redacted</li>
               <li>Secrets, passwords, or personal data</li>
               <li>Anything outside your sessions with the agent</li>
             </ul>

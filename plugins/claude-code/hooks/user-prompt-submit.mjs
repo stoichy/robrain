@@ -1,45 +1,71 @@
 #!/usr/bin/env node
-// UserPromptSubmit hook — pre-task veto injection. Semantic-searches the
-// decision corpus with the user's prompt; when relevant decisions carry
-// rejected[] alternatives, injects a compact warning BEFORE Claude starts
-// working. This is the moment native memory misses: right before a
-// previously rejected approach is about to happen again.
+// UserPromptSubmit hook — pre-task veto injection, two tiers:
+//  1. Deterministic: POST /veto-scan — does the prompt literally name an
+//     option an active decision rejected? Zero embeddings, zero LLM, fires
+//     for ANY prompt length. An exact mention warns at confidence 1.0.
+//  2. Semantic: GET /decisions?query= for prompts long enough to embed.
+//     Gated on SIMILARITY, not planning_score — planning_score blends in
+//     recency decay, and a rejection must not fade from warnings just
+//     because it is old.
+// Warnings already shown this session are not repeated (state file) —
+// injected context must never cost more than it saves.
 
 import {
   readStdin, parseHookInput, loadPerception, resolveProjectId,
-  perceptionFetch, emitContext, exitSilently,
+  perceptionFetch, emitContext, exitSilently, loadWarnedIds, recordWarnedIds,
 } from './lib.mjs'
 
 const input = parseHookInput(await readStdin())
 const prompt = (input.prompt ?? '').trim()
 
-// Skip: slash commands, trivial prompts (greetings, "yes", …) — searching
-// costs an embedding round-trip on every keystroke-to-enter.
-if (!prompt || prompt.startsWith('/') || prompt.length < 24) exitSilently()
+// Skip: slash commands and empty prompts. The deterministic tier is cheap
+// enough to run even on short prompts ("use Pinecone now" must warn).
+if (!prompt || prompt.startsWith('/')) exitSilently()
 
 const cwd = input.cwd ?? process.cwd()
+const sessionId = typeof input.session_id === 'string' ? input.session_id : ''
 const perception = loadPerception()
 const projectId = resolveProjectId(cwd)
 
-const params = new URLSearchParams({
-  project_id: projectId,
-  query: prompt.slice(0, 2000),
-  limit: '8',
-})
-const data = await perceptionFetch(`/decisions?${params}`, perception, {}, 2500)
-const decisions = Array.isArray(data) ? data : data?.decisions
-if (!Array.isArray(decisions)) exitSilently()
+// Tier 1 — deterministic rejected-option scan.
+const scan = await perceptionFetch('/veto-scan', perception, {
+  method: 'POST',
+  body: JSON.stringify({ project_id: projectId, text: prompt.slice(0, 2000) }),
+}, 1500)
+const exact = (Array.isArray(scan?.matches) ? scan.matches : [])
+  .map(m => ({ ...m, exact: true }))
 
-// Veto-first: only decisions with structured rejections, gated on SIMILARITY,
-// not planning_score — planning_score blends in recency decay, and a rejection
-// must not fade from warnings just because it is old. Similarity answers the
-// only question that matters here: is this decision about the same topic?
+// Tier 2 — semantic search only for prompts worth an embedding round-trip
+// (greetings, "yes", … skip it).
 const MIN_SIMILARITY = 0.45
-const vetoes = decisions
-  .filter(d => Array.isArray(d.rejected) && d.rejected.length > 0)
-  .filter(d => typeof d.similarity !== 'number' || d.similarity >= MIN_SIMILARITY)
-  .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
-  .slice(0, 3)
+let semantic = []
+if (prompt.length >= 24) {
+  const params = new URLSearchParams({
+    project_id: projectId,
+    query: prompt.slice(0, 2000),
+    limit: '8',
+  })
+  const data = await perceptionFetch(`/decisions?${params}`, perception, {}, 2500)
+  const decisions = Array.isArray(data) ? data : data?.decisions
+  if (Array.isArray(decisions)) {
+    semantic = decisions
+      .filter(d => Array.isArray(d.rejected) && d.rejected.length > 0)
+      .filter(d => typeof d.similarity !== 'number' || d.similarity >= MIN_SIMILARITY)
+      .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
+  }
+}
+
+// Merge: exact matches first (exempt from the similarity gate), then
+// semantic; skip anything already warned in this session.
+const warned = loadWarnedIds(sessionId)
+const seen = new Set()
+const vetoes = []
+for (const d of [...exact, ...semantic]) {
+  if (!d.id || seen.has(d.id) || warned.has(d.id)) continue
+  seen.add(d.id)
+  vetoes.push(d)
+  if (vetoes.length === 3) break
+}
 
 if (vetoes.length === 0) exitSilently()
 
@@ -48,8 +74,11 @@ const lines = vetoes.map(d => {
     .slice(0, 2)
     .map(r => `**${r.option}** (${r.reason})`)
     .join('; ')
-  return `- ${d.decision}\n  Rejected: ${rej}`
+  const tag = d.exact ? ' *(exact match on rejected option)*' : ''
+  return `- ${d.decision}${tag}\n  Rejected: ${rej}`
 })
+
+recordWarnedIds(sessionId, vetoes.map(d => d.id))
 
 emitContext(
   'UserPromptSubmit',

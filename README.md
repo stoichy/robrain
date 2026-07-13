@@ -122,7 +122,7 @@ Versus **Mem0**, **Cloudflare Agent Memory**, and **Claude Code Auto-Memory**: o
 | Passive session capture | ✓ | ✓ |
 | `rejected[]` field as structured data | ✓ | ✓ |
 | Decision lifecycle (active / superseded / invalidated) | ✓ | ✓ |
-| Cross-tool MCP — Claude Code, Cursor, Copilot, Codex CLI | ✓ | ✓ |
+| Cross-tool MCP — Claude Code, Cursor, Copilot, Codex CLI, Hermes | ✓ | ✓ |
 | Classifier LLM choice — Anthropic Haiku or OpenAI | ✓ | ✓ |
 | Always-on summary at session start | ✓ | ✓ |
 | `npx robrain review` / `inject` / `explain` / `export-memory` | ✓ | ✓ |
@@ -140,7 +140,8 @@ Versus **Mem0**, **Cloudflare Agent Memory**, and **Claude Code Auto-Memory**: o
 | Calibrated extraction prompt (fewer false positives) | — | ✓ |
 | Calibrated 4-way contradiction taxonomy | — | ✓ |
 | Automatic injection at task boundaries | — | ✓ |
-| Pre-task `rejected[]` warning | Claude Code only, via plugin | ✓ everywhere |
+| Deterministic veto scan (`POST /veto-scan`) | ✓ | — |
+| Pre-task `rejected[]` warning | Claude Code (plugin) + Hermes (provider) | ✓ everywhere |
 | Disengagement protocol (⚠ acknowledgement) | — | ✓ |
 | Pre-commit conflict verdict (`/dry-run` structured check) | — | ✓ |
 | Full 5-signal relevance scorer | — | ✓ |
@@ -198,6 +199,7 @@ Also on by default: secrets redaction (API keys, tokens, private keys, connectio
 - Memory interchange format (`robrain export`, `robrain-memory/v1` JSONL) → [docs/memory-interchange.md](docs/memory-interchange.md)
 - VetoBench (does memory stop rejected re-proposals? methodology + archived receipts) → [packages/vetobench/README.md](packages/vetobench/README.md)
 - Claude Code plugin (hook-based capture + veto warnings) → [plugins/claude-code/README.md](plugins/claude-code/README.md)
+- Hermes agent plugin (memory-provider, capture + veto warnings) → [integrations/hermes/robrain/README.md](integrations/hermes/robrain/README.md)
 
 ## Contributing
 

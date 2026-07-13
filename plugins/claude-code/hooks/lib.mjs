@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -171,6 +171,57 @@ function textOf(content) {
 
 function hasOnlyToolResults(content) {
   return Array.isArray(content) && content.length > 0 && content.every(b => b.type === 'tool_result')
+}
+
+// ── Session-scoped warning state ──────────────────────────────
+// The same veto re-injected on every on-topic prompt is context spend for
+// zero new information — Control must never cost more context than it saves.
+
+const STATE_DIR = join(homedir(), '.robrain', 'state')
+
+function warnedFile(sessionId) {
+  const safe = sessionId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120)
+  return join(STATE_DIR, `cc-warned-${safe}.json`)
+}
+
+/** Decision ids already warned about in this session. */
+export function loadWarnedIds(sessionId) {
+  if (!sessionId) return new Set()
+  try {
+    const ids = JSON.parse(readFileSync(warnedFile(sessionId), 'utf8'))
+    return new Set(Array.isArray(ids) ? ids : [])
+  } catch {
+    return new Set()
+  }
+}
+
+export function recordWarnedIds(sessionId, ids) {
+  if (!sessionId || ids.length === 0) return
+  try {
+    mkdirSync(STATE_DIR, { recursive: true })
+    const merged = [...new Set([...loadWarnedIds(sessionId), ...ids])].slice(-200)
+    writeFileSync(warnedFile(sessionId), JSON.stringify(merged))
+    cleanupStateDir()
+  } catch {
+    // fail-open — a broken state file must never block the session
+  }
+}
+
+/** Best-effort hygiene: drop state files older than 7 days. */
+function cleanupStateDir() {
+  try {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+    for (const f of readdirSync(STATE_DIR)) {
+      const p = join(STATE_DIR, f)
+      try {
+        if (statSync(p).mtimeMs < cutoff) unlinkSync(p)
+      } catch {
+        // race or permissions — skip
+      }
+    }
+  } catch {
+    // dir unreadable — skip
+  }
 }
 
 /** Emit hook JSON output (context injection) and exit 0. */

@@ -7,7 +7,7 @@ The plugin wires three lifecycle hooks into Claude Code, all backed by your self
 | Hook | What it does |
 |---|---|
 | `SessionStart` | Injects the always-on project summary — top decisions **with their rejected alternatives** — into every new session. |
-| `UserPromptSubmit` | Semantic-searches the decision corpus with your prompt. If the task touches a decision that carries a structured rejection (`rejected[]`), Claude gets a warning *before* it starts working. |
+| `UserPromptSubmit` | Two-tier pre-task veto: **tier 1** — `POST /veto-scan` (deterministic exact match on `rejected[]`, no embeddings); **tier 2** — semantic `GET /decisions?query=` for longer prompts. Warns before Claude starts working. |
 | `Stop` | Ships the completed turn to Perception for server-side decision extraction (async — never blocks your session). Capture becomes deterministic instead of depending on the model remembering to call MCP tools. |
 
 Every hook fails open: if Perception is down or unconfigured, your session is unaffected.

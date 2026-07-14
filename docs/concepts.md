@@ -587,6 +587,13 @@ Tracked improvements not yet implemented in this repo:
 
 ## Reference
 
+### Maintainer releases
+
+Shipping a new npm version requires the matching GHCR Perception image first.
+Full checklist (version bump files, release guard, tag push, npm publish, MCP
+registry, user messaging, clone vs no-clone pitfalls):
+**[docs/release.md](release.md)**.
+
 ### Honest tradeoffs
 
 Passive capture is more convenient than manual logging, but it comes with its own costs worth knowing before you adopt:

@@ -171,6 +171,8 @@ Memory benchmarks usually ask "did the right item come back?" [VetoBench](packag
 
 Two findings behind the table. Mem0's ingestion dropped the recorded rejection from **38% of retrieved contexts**, and violations concentrated exactly there — 26% when the veto was absent vs 3% when present: the agent avoided Express in all five runs but could never say why, and where the axios veto was lost it re-proposed axios outright in 3 of 5 runs. RoBrain's production extractor, on the same input, kept **100/100 vetoes** — keeping the veto is the extraction prompt's job, not a side effect of fact summarization.
 
+**Exploratory: Meta Muse Spark 1.1 (2026-07-13).** First live runs against Meta's newly launched agentic flagship, via Vercel AI Gateway. Without memory it re-proposed rejected approaches in **6 of 8** completed scenarios (Redux, Prisma, Jest, CSS-in-JS, drizzle-kit, GraphQL); with RoBrain retrieval, **0 of 9** — naming the prior rejection every time. The cleanest cell: asked to cut mobile overfetching, the no-memory run proposed a full GraphQL rollout (the approach the team had ruled out); with RoBrain in context it proposed REST sparse fieldsets and cited the recorded rejection, reason and date included. Not yet a quotable series — free-tier rate limits split the runs, one scenario never completed, and one is excluded because Meta's content filter deterministically blocks a benign session-caching prompt. Receipts and full caveats: [results/muse-spark-1.1-series/](packages/vetobench/results/muse-spark-1.1-series/).
+
 Every retrieved context, agent reply, and verdict is committed in [packages/vetobench/results/](packages/vetobench/results/) — check the work before quoting it. The retrieval layer runs offline with no API key and gates CI (`pnpm --filter @robrain/vetobench bench`); judging is deterministic — no LLM judge. Any memory system plugs in through one adapter interface; PRs welcome, including ones that make us look bad. Methodology, honesty caveats, and fixtures: [packages/vetobench/README.md](packages/vetobench/README.md).
 
 ## Security
@@ -197,6 +199,7 @@ Also on by default: secrets redaction (API keys, tokens, private keys, connectio
 
 - Concepts (how it works, two pillars, Synthesis, comparisons) → [docs/concepts.md](docs/concepts.md)
 - CLI reference (`explain`, install, upgrading, editor setup, full command table) → [docs/cli.md](docs/cli.md)
+- **Maintainer release checklist** (tag → GHCR → npm → MCP registry) → [docs/release.md](docs/release.md)
 - Troubleshooting (silent 401s, Docker rebuilds, stale summaries) → [docs/troubleshooting.md](docs/troubleshooting.md)
 - Memory interchange format (`robrain export`, `robrain-memory/v1` JSONL) → [docs/memory-interchange.md](docs/memory-interchange.md)
 - VetoBench (does memory stop rejected re-proposals? methodology + archived receipts) → [packages/vetobench/README.md](packages/vetobench/README.md)

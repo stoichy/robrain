@@ -157,6 +157,8 @@ stop landing, check `PERCEPTION_API_KEY` in the managed block (see [troubleshoot
 
 When a new RoBrain release is out, update every layer you installed: the **CLI** (`npx` or global), the **Perception Docker image**, and **editor MCP configs**. Postgres data and your `.env` secrets stay in place — you are not reinstalling from scratch.
 
+**Maintainers:** see **[docs/release.md](release.md)** for the full tag → GHCR → npm → MCP registry checklist (including the release guard).
+
 Check what you are running: `npx robrain --version`. Compare with [GitHub — Releases](https://github.com/adelinamart/robrain/releases) or the latest `main` branch.
 
 ### No-clone stack (`robrain up`)

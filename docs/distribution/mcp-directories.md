@@ -116,18 +116,13 @@ at repo root — **[`server.json`](../../server.json)** (already committed, sche
 launch command.
 
 **✅ DONE (2026-07-10):** `io.github.adelinamart/robrain` v2.3.7 is live in the
-registry and queryable. For future releases, the flow is:
+registry and queryable. For future releases, follow the full checklist in
+**[docs/release.md](../release.md)** (summary below).
 
-1. Keep `"mcpName": "io.github.adelinamart/robrain"` in `packages/cli/package.json`
-   (the registry's ownership check reads it from the **published** npm package).
-2. Set both `version` fields in `server.json` to the npm release you publish.
-   Keep `description` ≤ **100 chars** (the API rejects longer).
-3. Tag and push the release: `git tag v<version> && git push origin v<version>`,
-   then wait for the `publish-perception-image` workflow to go green — `robrain up`
-   defaults to the GHCR image matching the CLI version, so the image must exist
-   before npm does. (The `prepublishOnly` release guard blocks publishing until it does.)
-4. `pnpm --filter robrain publish`, then `mcp-publisher login github` +
-   `mcp-publisher publish` from the repo root.
+1. Keep `"mcpName": "io.github.adelinamart/robrain"` in `packages/cli/package.json`.
+2. Bump both `version` fields in `server.json` (description ≤ 100 chars).
+3. Complete tag → GHCR → npm per **[release.md](../release.md)**.
+4. `mcp-publisher publish` from repo root (`login github` only on 401 / expired JWT).
 
 PulseMCP ingests registry entries automatically (§4).
 

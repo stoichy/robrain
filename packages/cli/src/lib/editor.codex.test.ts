@@ -24,6 +24,28 @@ const baseOpts = {
 }
 
 describe('renderCodexBlock', () => {
+  it('omits hooks tables when no codexHooksDir is provided', () => {
+    const block = renderCodexBlock({ ...baseOpts, includeControl: false })
+    assert.doesNotMatch(block, /\[\[hooks\./)
+  })
+
+  it('wires the three lifecycle hooks when codexHooksDir is set', () => {
+    const block = renderCodexBlock({
+      ...baseOpts,
+      includeControl: false,
+      codexHooksDir: '/home/user/.robrain/hooks/codex',
+    })
+    assert.match(block, /\[\[hooks\.SessionStart\]\]/)
+    assert.match(block, /\[\[hooks\.UserPromptSubmit\]\]/)
+    assert.match(block, /\[\[hooks\.Stop\]\]/)
+    // command strings quote the script path and run it with node
+    assert.match(block, /command = "node \\"\/home\/user\/\.robrain\/hooks\/codex\/user-prompt-submit\.mjs\\""/)
+    // capture must be async so it never blocks the turn ending
+    assert.match(block, /\[\[hooks\.Stop\.hooks\]\]\ntype = "command"\ncommand = [^\n]+\ntimeout = 30\nasync = true/)
+    // hooks tables must stay inside the managed block
+    assert.ok(block.indexOf('[[hooks.Stop]]') < block.indexOf('# <!-- /robrain -->'))
+  })
+
   it('includes sensing server with enabled and env', () => {
     const block = renderCodexBlock({ ...baseOpts, includeControl: false })
     assert.match(block, /\[mcp_servers\.robrain-sensing\]/)

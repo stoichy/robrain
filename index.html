@@ -749,8 +749,9 @@ npx robrain install --self-hosted                 # wire the MCP server into you
           <code>npx robrain doctor</code> diagnoses the setup.
         </p>
         <p>
-          Claude Code users should also install the plugin, which adds deterministic hook-based capture and pre-task
-          warnings about rejected approaches:
+          Claude Code users should also install the plugin for hook-based capture and pre-task
+          warnings about rejected approaches. Codex CLI users get the same hooks automatically
+          from <code>robrain install</code> (trust them on first Codex run):
         </p>
         <pre><code>claude plugin marketplace add adelinamart/robrain
 claude plugin install robrain@robrain</code></pre>
@@ -791,9 +792,9 @@ claude plugin install robrain@robrain</code></pre>
           <li>
             <strong>Pre-task veto warnings</strong>
             Self-hosted Perception exposes <code>POST /veto-scan</code> for deterministic exact-match on
-            <code>rejected[]</code> (no LLM). The Claude Code plugin calls it on every prompt, then semantic search for
-            longer tasks; Hermes renders semantic <code>REJECTED:</code> warnings per turn. Other editors get prior
-            decisions at session start via the always-on summary.
+            <code>rejected[]</code> (no LLM). The Claude Code plugin and Codex hooks call it on every prompt, then
+            semantic search for longer tasks; Hermes renders semantic <code>REJECTED:</code> warnings per turn. Other
+            editors get prior decisions at session start via the always-on summary.
           </li>
           <li>
             <strong>Passive capture</strong>
@@ -1154,7 +1155,7 @@ hermes memory setup    # select "robrain"</code></pre>
               <tr><th scope="row">Fully-local mode — LLM + embeddings on Ollama / LM Studio / vLLM</th><td>✓</td><td class="muted">—</td></tr>
               <tr><th scope="row">Automatic injection at task boundaries</th><td class="muted">manual <code>inject</code></td><td>✓</td></tr>
               <tr><th scope="row">Deterministic veto scan (<code>POST /veto-scan</code>)</th><td>✓</td><td class="muted">—</td></tr>
-              <tr><th scope="row">Pre-task <code>rejected[]</code> warning before the agent acts</th><td class="muted">Claude Code (plugin) and Hermes (provider)</td><td>✓ everywhere</td></tr>
+              <tr><th scope="row">Pre-task <code>rejected[]</code> warning before the agent acts</th><td class="muted">Claude Code (plugin), Codex (hooks), and Hermes (provider)</td><td>✓ everywhere</td></tr>
               <tr><th scope="row">Pre-commit conflict verdict (<code>/dry-run</code>)</th><td class="muted">—</td><td>✓</td></tr>
               <tr><th scope="row">5-signal relevance scorer</th><td>✓ on retrieval</td><td>✓ applied automatically per task</td></tr>
               <tr><th scope="row">Calibrated extraction prompt (fewer false positives)</th><td class="muted">—</td><td>✓</td></tr>
@@ -1203,6 +1204,9 @@ hermes memory setup    # select "robrain"</code></pre>
           </li>
           <li style="margin-bottom: 0.45rem">
             <a href="https://github.com/adelinamart/robrain/tree/main/plugins/claude-code">plugins/claude-code</a> — hook-based capture + veto warnings
+          </li>
+          <li style="margin-bottom: 0.45rem">
+            <a href="https://github.com/adelinamart/robrain/blob/main/plugins/codex/README.md">plugins/codex</a> — Codex CLI hooks (wired by <code>robrain install</code>)
           </li>
           <li>
             <a href="https://github.com/adelinamart/robrain/blob/main/integrations/hermes/robrain/README.md">integrations/hermes/robrain</a> — Hermes memory-provider plugin (capture + veto warnings)

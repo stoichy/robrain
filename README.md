@@ -102,6 +102,8 @@ Review what it finds with `npx robrain review`. Deep dive (three passes, cron, e
 
 One cross-tool setup covers **Claude Code, Cursor, GitHub Copilot (VS Code), and Codex CLI** against the same Postgres store. The classifier LLM is your choice — Anthropic Haiku or OpenAI. Decisions carry a lifecycle (active / superseded / invalidated) and a graph (`conflicts_with` / `extends` / `related_to`).
 
+**Codex CLI / IDE** also gets hook-based capture and pre-task veto warnings — the same lifecycle hooks as the Claude Code plugin, wired automatically by `robrain install` into `~/.codex/config.toml` (Codex asks you to trust them on first run). Docs: [plugins/codex](plugins/codex/README.md).
+
 Running [Hermes](https://github.com/NousResearch/hermes-agent)? `npx robrain install --hermes` drops a standalone memory-provider plugin into `~/.hermes/plugins/` — passive capture and veto-aware recall through the same Perception API. Docs: [integrations/hermes](integrations/hermes/robrain/README.md).
 
 Decision ledger for git (opt-in):
@@ -141,7 +143,7 @@ Versus **Mem0**, **Cloudflare Agent Memory**, and **Claude Code Auto-Memory**: o
 | Calibrated 4-way contradiction taxonomy | — | ✓ |
 | Automatic injection at task boundaries | — | ✓ |
 | Deterministic veto scan (`POST /veto-scan`) | ✓ | — |
-| Pre-task `rejected[]` warning | Claude Code (plugin) + Hermes (provider) | ✓ everywhere |
+| Pre-task `rejected[]` warning | Claude Code (plugin) + Codex (hooks) + Hermes (provider) | ✓ everywhere |
 | Disengagement protocol (⚠ acknowledgement) | — | ✓ |
 | Pre-commit conflict verdict (`/dry-run` structured check) | — | ✓ |
 | 5-signal relevance scorer | ✓ on retrieval (`GET /decisions?query=`) | ✓ applied automatically per task |
@@ -199,6 +201,7 @@ Also on by default: secrets redaction (API keys, tokens, private keys, connectio
 - Memory interchange format (`robrain export`, `robrain-memory/v1` JSONL) → [docs/memory-interchange.md](docs/memory-interchange.md)
 - VetoBench (does memory stop rejected re-proposals? methodology + archived receipts) → [packages/vetobench/README.md](packages/vetobench/README.md)
 - Claude Code plugin (hook-based capture + veto warnings) → [plugins/claude-code/README.md](plugins/claude-code/README.md)
+- Codex CLI hooks (same lifecycle hooks, wired by `robrain install`) → [plugins/codex/README.md](plugins/codex/README.md)
 - Hermes agent plugin (memory-provider, capture + veto warnings) → [integrations/hermes/robrain/README.md](integrations/hermes/robrain/README.md)
 
 ## Contributing

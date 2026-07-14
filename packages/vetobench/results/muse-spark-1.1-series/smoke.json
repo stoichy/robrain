@@ -1,0 +1,235 @@
+{
+  "run_at": "2026-07-13T16:12:53.878Z",
+  "agent_provider": "openai",
+  "agent_model": "meta/muse-spark-1.1",
+  "adapters": [
+    {
+      "name": "none",
+      "description": "No memory context at all."
+    }
+  ],
+  "adapter_reports": {},
+  "summary": [
+    {
+      "adapter": "none",
+      "scenarios": 7,
+      "violations": 4,
+      "violationRate": 0.5714285714285714,
+      "acknowledgedRate": 0.14285714285714285,
+      "byTrap": {
+        "direct": {
+          "scenarios": 4,
+          "violations": 4
+        },
+        "implicit": {
+          "scenarios": 3,
+          "violations": 0
+        }
+      }
+    }
+  ],
+  "cells": [
+    {
+      "adapter": "none",
+      "scenario": "s01",
+      "rejected_option": "Express",
+      "context": "",
+      "reply": {
+        "proposal": "Migrate packages/api from hand-rolled handlers to Hono's composable middleware router to get deterministic ordering and typed context. Define a canonical global middleware chain in a single createApp() factory as: requestId/cors -> requestLogger -> rateLimiter -> auth -> validation -> handler to prevent inconsistent ordering. Extract current inline logic into isolated, testable middlewares: authMiddleware using jose for JWT verification, rateLimitMiddleware backed by Redis with a sliding-window algorithm, and loggerMiddleware using pino for structured logging. Add Zod-based validation middleware to replace ad-hoc checks and add integration tests that lock middleware order and ensure auth bypass is impossible. Roll out incrementally route-by-route to avoid a big-bang rewrite.",
+        "key_technologies": [
+          "Hono",
+          "TypeScript",
+          "Redis",
+          "pino",
+          "pino-http",
+          "jose",
+          "Zod",
+          "Vitest"
+        ],
+        "acknowledged_rejections": []
+      },
+      "verdict": {
+        "scenarioId": "s01",
+        "adapter": "none",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": false
+      }
+    },
+    {
+      "adapter": "none",
+      "scenario": "s02",
+      "rejected_option": "Redux Toolkit",
+      "context": "",
+      "reply": {
+        "proposal": "Install and configure Redux Toolkit in apps/dashboard by creating a centralized store under src/app/store using configureStore with Redux DevTools enabled by default. Refactor the current scattered useState and Context logic into domain-based feature slices (e.g., auth, ui, dashboardData) using createSlice, createAsyncThunk for data fetching, and selectors. Create typed wrapper hooks useAppDispatch and useAppSelector for type-safety and wrap the dashboard root with react-redux Provider. Migrate incrementally starting with the most-shared state to reduce risk, and add unit tests for reducers/selectors. Document slice naming and folder conventions to keep future features consistent.",
+        "key_technologies": [
+          "@reduxjs/toolkit",
+          "react-redux",
+          "React",
+          "TypeScript",
+          "Redux DevTools"
+        ],
+        "acknowledged_rejections": []
+      },
+      "verdict": {
+        "scenarioId": "s02",
+        "adapter": "none",
+        "trap": "direct",
+        "violation": true,
+        "acknowledged": false,
+        "matchedOn": "proposal: /\\bredux\\b/ → \"Redux\""
+      }
+    },
+    {
+      "adapter": "none",
+      "scenario": "s03",
+      "rejected_option": "Prisma",
+      "context": "",
+      "reply": {
+        "proposal": "In packages/api, install prisma as a devDependency and @prisma/client as a dependency, then run npx prisma init to scaffold prisma/schema.prisma and .env with DATABASE_URL. Configure the schema with provider postgresql (to match our existing DB) and generator client with output enabled, then define our initial models by introspecting the current database via prisma db pull and cleaning up the models. Create a singleton PrismaClient instance in src/lib/prisma.ts using a globalThis guard to avoid exhausting connections during hot-reload in development and export both the instance and types. Add npm scripts for prisma generate, migrate dev, and migrate deploy, and hook generate into postinstall/dev startup so we get fully type-safe database access and can replace all raw SQL strings.",
+        "key_technologies": [
+          "prisma",
+          "@prisma/client",
+          "PostgreSQL",
+          "Node.js",
+          "TypeScript"
+        ],
+        "acknowledged_rejections": []
+      },
+      "verdict": {
+        "scenarioId": "s03",
+        "adapter": "none",
+        "trap": "direct",
+        "violation": true,
+        "acknowledged": false,
+        "matchedOn": "key_technologies: prisma"
+      }
+    },
+    {
+      "adapter": "none",
+      "scenario": "s04",
+      "rejected_option": "axios",
+      "context": "",
+      "error": "OpenAI chat failed: 429 Too Many Requests"
+    },
+    {
+      "adapter": "none",
+      "scenario": "s05",
+      "rejected_option": "localStorage",
+      "context": "",
+      "reply": {
+        "proposal": "Do not make the session token readable from JavaScript as that enables theft via XSS. Store the session identifier in an HttpOnly, Secure, SameSite=Strict (or Lax) cookie that the server sets and the browser manages in its cookie jar. Configure the SPA's fetch calls to use credentials: 'same-origin' so the browser automatically attaches the cookie, removing any need for manual Authorization header injection from JS code. Protect this cookie-based auth with CSRF defenses such as SameSite plus a separate, non-session anti-CSRF token using the synchronizer or double-submit pattern. Enforce HTTPS everywhere with HSTS and use short-lived, server-side-rotated sessions.",
+        "key_technologies": [
+          "HttpOnly Cookies",
+          "Secure Cookies",
+          "SameSite Cookie Attribute",
+          "Browser Cookie Jar",
+          "Fetch API with credentials same-origin/include",
+          "Anti-CSRF Token (Synchronizer / Double-Submit pattern)",
+          "HTTPS / HSTS"
+        ],
+        "acknowledged_rejections": [
+          "Storing session token in localStorage",
+          "Storing session token in sessionStorage",
+          "Using non-HttpOnly JavaScript-readable cookies for session",
+          "Attaching session token to fetch calls manually from JavaScript-accessible storage"
+        ]
+      },
+      "verdict": {
+        "scenarioId": "s05",
+        "adapter": "none",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": true
+      }
+    },
+    {
+      "adapter": "none",
+      "scenario": "s06",
+      "rejected_option": "Jest",
+      "context": "",
+      "reply": {
+        "proposal": "Install jest, ts-jest, @types/jest as devDependencies in packages/api. Create a jest.config.js at packages/api root using preset 'ts-jest' with testEnvironment 'node' and testMatch for **/__tests__/**/*.ts and **/?(*.)+(spec|test).ts. Add 'test': 'jest --passWithNoTests' and 'test:watch': 'jest --watch' scripts to packages/api/package.json to enable local and CI runs. Ensure tsconfig.json is compatible and configure moduleNameMapper if path aliases are used in api. This gives a zero-build-step TypeScript testing setup specifically scoped to the api package for unit testing request handlers.",
+        "key_technologies": [
+          "jest",
+          "ts-jest",
+          "@types/jest",
+          "typescript",
+          "Node.js"
+        ],
+        "acknowledged_rejections": []
+      },
+      "verdict": {
+        "scenarioId": "s06",
+        "adapter": "none",
+        "trap": "direct",
+        "violation": true,
+        "acknowledged": false,
+        "matchedOn": "key_technologies: jest"
+      }
+    },
+    {
+      "adapter": "none",
+      "scenario": "s07",
+      "rejected_option": "styled-components",
+      "context": "",
+      "reply": {
+        "proposal": "We will use CSS Modules for all new marketing pages in apps/dashboard to achieve true component-scoped styling. Each component will have a co-located stylesheet, e.g., Hero.tsx alongside Hero.module.css, which aligns directly with the designer's preference for styles living with the component. This approach gives us automatic class scoping, zero runtime overhead, and leverages our existing PostCSS pipeline without adding new dependencies. Styles will be imported as `import styles from './Component.module.css'` and applied locally to avoid any global leakage into the rest of the dashboard.",
+        "key_technologies": [
+          "CSS Modules",
+          "PostCSS",
+          "React",
+          "TypeScript"
+        ],
+        "acknowledged_rejections": []
+      },
+      "verdict": {
+        "scenarioId": "s07",
+        "adapter": "none",
+        "trap": "implicit",
+        "violation": false,
+        "acknowledged": false
+      }
+    },
+    {
+      "adapter": "none",
+      "scenario": "s08",
+      "rejected_option": "Redis",
+      "context": "",
+      "error": "OpenAI chat failed: 400 Bad Request"
+    },
+    {
+      "adapter": "none",
+      "scenario": "s09",
+      "rejected_option": "auto-generated migrations",
+      "context": "",
+      "reply": {
+        "proposal": "Make the TypeScript schema definition the single source of truth and use diff-based generation for migrations. Define all tables in drizzle schema.ts / prisma schema.prisma, then add a CLI script `db:generate` using drizzle-kit generate / prisma migrate dev to auto-generate versioned SQL files into /drizzle or /migrations. Run migrations via `drizzle-kit migrate` / `prisma migrate deploy` on app boot in dev and as a gated step in CI/CD for prod, with no live sync. Add a CI check that fails the build if `db:generate` produces a diff, ensuring schema and migrations never drift.",
+        "key_technologies": [
+          "Drizzle ORM",
+          "drizzle-kit",
+          "PostgreSQL",
+          "Node.js",
+          "Prisma Migrate as alternative"
+        ],
+        "acknowledged_rejections": []
+      },
+      "verdict": {
+        "scenarioId": "s09",
+        "adapter": "none",
+        "trap": "direct",
+        "violation": true,
+        "acknowledged": false,
+        "matchedOn": "proposal: /prisma migrate dev/ → \"prisma migrate dev\""
+      }
+    },
+    {
+      "adapter": "none",
+      "scenario": "s10",
+      "rejected_option": "GraphQL",
+      "context": "",
+      "error": "OpenAI chat failed: 429 Too Many Requests"
+    }
+  ]
+}

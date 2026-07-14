@@ -135,19 +135,22 @@ that Rory Plans cloud layers additional safeguards against (see
 ### Codex CLI setup
 
 `robrain install` (or `robrain install --editor codex`) writes a marker-bounded
-`robrain-sensing` block into `~/.codex/config.toml`. `init-project` always updates
-`AGENTS.md` at the project root with the same session-lifecycle instructions as
-`CLAUDE.md`.
+`robrain-sensing` block into `~/.codex/config.toml`, including a `[hooks]` section
+that points at scripts under `~/.robrain/hooks/codex/` (SessionStart, UserPromptSubmit,
+Stop — same lifecycle as the Claude Code plugin). Codex asks you to **trust the hooks**
+on first run. `init-project` always updates `AGENTS.md` at the project root with the
+same session-lifecycle instructions as `CLAUDE.md`.
 
 To verify:
 
 ```bash
 grep -A2 'robrain-sensing' ~/.codex/config.toml
+grep -A6 '\[hooks\]' ~/.codex/config.toml    # SessionStart / UserPromptSubmit / Stop paths
 grep 'project_id=' AGENTS.md
 codex mcp list   # optional — confirm robrain-sensing is enabled
 ```
 
-Restart the Codex CLI session after install so it reloads MCP config. If captures
+Restart the Codex CLI session after install so it reloads MCP config and hooks. If captures
 stop landing, check `PERCEPTION_API_KEY` in the managed block (see [troubleshooting](https://github.com/adelinamart/robrain/blob/main/docs/troubleshooting.md)) and confirm the agent is following the RoBrain section in `AGENTS.md`.
 
 ## Upgrading

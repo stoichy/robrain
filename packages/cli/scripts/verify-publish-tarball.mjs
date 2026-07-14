@@ -20,6 +20,7 @@ mkdirSync(work, { recursive: true })
 try {
   execFileSync('node', ['scripts/vendor-sensing-mcp.mjs'], { cwd: cliRoot, stdio: 'inherit' })
   execFileSync('node', ['scripts/vendor-hermes-plugin.mjs'], { cwd: cliRoot, stdio: 'inherit' })
+  execFileSync('node', ['scripts/vendor-codex-hooks.mjs'], { cwd: cliRoot, stdio: 'inherit' })
 
   execFileSync('pnpm', ['pack', '--pack-destination', work], { cwd: cliRoot, stdio: 'inherit' })
 
@@ -68,6 +69,14 @@ try {
   const { dest } = installHermesPlugin(hermesHome)
   if (!existsSync(join(dest, 'plugin.yaml'))) {
     fail(`installHermesPlugin() copy incomplete at ${dest}`)
+  }
+
+  // Codex hooks: vendored scripts present and installable from the tarball.
+  const codexHooksUrl = pathToFileURL(join(extracted, 'dist', 'lib', 'codex-hooks.js')).href
+  const { installCodexHooks } = await import(codexHooksUrl)
+  const codexHooksDest = installCodexHooks(join(work, 'codex-hooks'))
+  if (!codexHooksDest || !existsSync(join(codexHooksDest, 'stop.mjs'))) {
+    fail('installCodexHooks() could not materialize from the tarball vendor dir')
   }
 
   // Smoke-test the server entry robrain mcp execs (no CLI deps needed in the tarball).

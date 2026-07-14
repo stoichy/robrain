@@ -224,6 +224,42 @@ function cleanupStateDir() {
   }
 }
 
+// ── Per-session prompt stash ──────────────────────────────────
+// Written by the UserPromptSubmit hook, read by stop hooks that cannot rely
+// on a parseable transcript (Codex ships last_assistant_message on Stop stdin
+// but its transcript format is not a contract we own). Pairing the stashed
+// prompt with that message gives deterministic capture with zero transcript
+// assumptions.
+
+function stashFile(sessionId) {
+  const safe = sessionId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120)
+  return join(STATE_DIR, `stash-${safe}.json`)
+}
+
+export function stashPrompt(sessionId, prompt) {
+  if (!sessionId || !prompt) return
+  try {
+    mkdirSync(STATE_DIR, { recursive: true })
+    const prev = loadPromptStash(sessionId)
+    writeFileSync(stashFile(sessionId), JSON.stringify({
+      prompt: prompt.slice(0, 60_000),
+      sequence: (prev?.sequence ?? 0) + 1,
+    }))
+  } catch {
+    // fail-open
+  }
+}
+
+export function loadPromptStash(sessionId) {
+  if (!sessionId) return null
+  try {
+    const s = JSON.parse(readFileSync(stashFile(sessionId), 'utf8'))
+    return typeof s?.prompt === 'string' ? s : null
+  } catch {
+    return null
+  }
+}
+
 /** Emit hook JSON output (context injection) and exit 0. */
 export function emitContext(hookEventName, additionalContext) {
   if (additionalContext) {

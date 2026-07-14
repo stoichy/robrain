@@ -27,6 +27,7 @@ import {
   sensingBundleReady,
   McpBundleError,
 } from '../lib/mcp-bundle.js'
+import { installCodexHooks } from '../lib/codex-hooks.js'
 import { initProjectCommand }                                   from './init-project.js'
 import {
   inferLocalRobrainMonorepoRoot,
@@ -48,6 +49,22 @@ interface InstallOptions {
   repoRoot?:      string
   /** Do not run `init-project` in cwd after a successful install */
   skipInitProject?: boolean
+}
+
+/** Materialize Codex hook scripts when Codex is in the install set; warn on failure. */
+function resolveCodexHooksForInstall(
+  editors: Array<{ editor: string }>,
+): string | undefined {
+  if (!editors.some(e => e.editor === 'codex')) return undefined
+  const dir = installCodexHooks()
+  if (!dir) {
+    console.log(chalk.yellow(
+      '  ⚠ Codex hooks were not installed — hook scripts not found in this CLI package.\n' +
+      '    MCP config was written; re-run after: npm install -g robrain@latest (or pnpm build in a clone).',
+    ))
+    console.log()
+  }
+  return dir
 }
 
 async function chainInitAfterInstall(opts: InstallOptions): Promise<void> {
@@ -234,6 +251,7 @@ export async function installCommand(opts: InstallOptions): Promise<void> {
     llmProvider,
     openaiKey:         process.env.OPENAI_API_KEY ?? '',
     includeControl,
+    codexHooksDir:     resolveCodexHooksForInstall(editorsToConfig),
   }
 
   for (const editor of editorsToConfig) {
@@ -405,6 +423,7 @@ async function installSelfHosted(opts: InstallOptions): Promise<void> {
     llmProvider,
     openaiKey:         llmProvider === 'openai' ? openaiKey : undefined,
     includeControl:    false as const,
+    codexHooksDir:     resolveCodexHooksForInstall(editorsToConfig),
   }
 
   for (const editor of editorsToConfig) {

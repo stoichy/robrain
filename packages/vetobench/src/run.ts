@@ -124,6 +124,10 @@ async function behavioralLayer(
         archiveCells.push({ adapter: adapter.name, scenario: s.id, rejected_option: s.rejected_option, context, error: err instanceof Error ? err.message : String(err) })
         console.error(`${adapter.name.padEnd(12)} ${s.id}  ERROR: ${err instanceof Error ? err.message : String(err)}`)
       }
+      // Pace calls to stay under free-tier rate limits (e.g. Muse Spark on the
+      // Vercel AI Gateway free tier). Off by default; set VETOBENCH_THROTTLE_MS.
+      const throttleMs = Number.parseInt(process.env.VETOBENCH_THROTTLE_MS ?? '', 10) || 0
+      if (throttleMs > 0) await new Promise(r => setTimeout(r, throttleMs))
     }
   }
 

@@ -14,7 +14,7 @@ Every memory product answers *"what did we store?"* RoBrain is built around four
 
 | Product (what it stores) | Capture | Rejected options as data | Worth keeping? | Still true? | Actually worked? | Attention now? | Team & cross-tool | Fully local |
 |---|---|---|---|---|---|---|---|---|
-| **RoBrain OSS** (structured decisions: rationale, files, `rejected[]`, provenance) | Deterministic via plugin hooks (every turn shipped) + MCP for other editors | ✅ **first-class, queryable** | ✅ classifier + confidence floor + human review queue, per-memory provenance | ✅ contradiction scan + drift detection + supersession lifecycle — old decisions stay queryable | ✅ git-revert outcomes scan + used/ignored counters with auto-demotion + VetoBench CI gates | ✅ always-on summary at session start **+ pre-task warnings** (`POST /veto-scan` + Claude Code plugin / Hermes provider) | ✅ shared Postgres across Claude Code, Cursor, Copilot, Codex, Hermes | ✅ Ollama/LM Studio/vLLM mode + secrets redaction at ingest |
+| **RoBrain OSS** (structured decisions: rationale, files, `rejected[]`, provenance) | Deterministic via plugin hooks (every turn shipped) + MCP for other editors | ✅ **first-class, queryable** | ✅ classifier + confidence floor + human review queue, per-memory provenance | ✅ contradiction scan + drift detection + supersession lifecycle — old decisions stay queryable | ✅ git-revert outcomes scan + used/ignored counters with auto-demotion + VetoBench CI gates | ✅ always-on summary at session start **+ pre-task warnings** (`POST /veto-scan` + Claude Code plugin / Codex hooks / Hermes provider) | ✅ shared Postgres across Claude Code, Cursor, Copilot, Codex, Hermes | ✅ Ollama/LM Studio/vLLM mode + secrets redaction at ingest |
 | **RoBrain Cloud** (Rory Plans — same store, managed) | Same, calibrated extraction prompt | ✅ + auto-propagated vetoes (supersessions inherit rejection history) | ✅ + helpful/pushback feedback per injection | ✅ + write-time supersession detection + contradiction taxonomy + guard-railed auto-resolution + lineage timeline | ✅ same outcome loop + full 5-signal relevance scorer | ✅ automatic injection at task boundaries, blocking ⚠ acknowledgement protocol, pre-commit `/dry-run` conflict verdict | ✅ org isolation — API keys, roles, scoped access | — processed remotely |
 | **Claude Code** (CLAUDE.md + auto memory markdown) | You write / model chooses to save | ❌ prose at best | Model discretion; you edit after the fact | ❌ edits overwrite; conflicting rules picked arbitrarily | ❌ | Unranked file load at session start | CLAUDE.md via git (human-written); auto memory machine-local, per-tool | Files local, bound to Claude Code + Anthropic |
 | **claude.ai memory** (profile summary) | Auto-synthesized from chats | ❌ | Opaque heuristic; edit/delete after | Periodic silent re-summary | ❌ | Injected into new chats, no task ranking | ❌ per-user | ❌ hosted |
@@ -339,7 +339,7 @@ When the plugin hook — or, in cloud, Control — sees a task, it scans the tas
 
 This happens at the right moment — before the agent has suggested anything — not after. It's the difference between a system that reminds you of the past and one that steers you away from known mistakes before they happen.
 
-All of this runs on the `rejected[]` substrate the Free / self-hosted version captures. On Claude Code the plugin hook acts on those vetoes locally, before the agent responds. Hermes does the same via semantic prefetch (`REJECTED:` warnings per turn). Cloud extends task-boundary injection to Cursor, Copilot, and Codex without a per-prompt hook.
+All of this runs on the `rejected[]` substrate the Free / self-hosted version captures. On Claude Code the plugin hook acts on those vetoes locally, before the agent responds. Codex CLI gets the same three hooks via `robrain install` (materialized under `~/.robrain/hooks/codex/` and wired in `~/.codex/config.toml`). Hermes does the same via semantic prefetch (`REJECTED:` warnings per turn). Cloud extends task-boundary injection to Cursor, Copilot, and Codex without a per-prompt hook.
 
 #### `POST /veto-scan` — deterministic tier (self-hosted Perception)
 
@@ -400,7 +400,7 @@ The self-hosted version already brings decisions back automatically through the 
 | Calibrated 4-way contradiction taxonomy | — | ✓ |
 | Automatic injection at task boundaries | — | ✓ |
 | Deterministic veto scan (`POST /veto-scan` — exact rejected-option match) | ✓ | — |
-| Pre-task `rejected[]` warning | ✓ Claude Code plugin + Hermes provider | ✓ every tool |
+| Pre-task `rejected[]` warning | ✓ Claude Code plugin + Codex hooks + Hermes provider | ✓ every tool |
 | Disengagement protocol (⚠ acknowledgement) | — | ✓ |
 | Pre-commit conflict verdict (`/dry-run` structured check) | — | ✓ |
 | 5-signal relevance scorer | ✓ on retrieval (`GET /decisions?query=`) | ✓ applied automatically per task |
@@ -457,7 +457,7 @@ The two can coexist: Auto memory for lightweight scratch notes; RoBrain for cano
 Your AI agent resets every session.
 Mem0 stores facts. Zep stores entity relationships and conversation history. Neither exposes rejected alternatives as a first-class, structured field you can query — which means your agent can know "we use Zustand" but not "we considered Redux and ruled it out for a specific reason." The veto gets lost in prose or not captured at all.
 
-RoBrain stores each veto in **`rejected[]`** so the judgment layer can act on it: pre-task warnings (Claude Code plugin hook, Hermes provider, the deterministic `POST /veto-scan` endpoint, or cloud Control), semantic inject, contradiction surfacing, and Synthesis clustering — not as an isolated novelty, but as the structured input those features require.
+RoBrain stores each veto in **`rejected[]`** so the judgment layer can act on it: pre-task warnings (Claude Code plugin hook, Codex hooks, Hermes provider, the deterministic `POST /veto-scan` endpoint, or cloud Control), semantic inject, contradiction surfacing, and Synthesis clustering — not as an isolated novelty, but as the structured input those features require.
 
 We are not aware of another coding agent memory tool with a first-class rejected alternatives field — but we welcome corrections if that's wrong.
 

@@ -149,6 +149,8 @@ export interface McpWriteOptions {
   openaiKey?: string
   /** When false, drops robrain-control (OSS self-hosted — Control ships with Rory cloud only). Default true. */
   includeControl?: boolean
+  /** Absolute dir of materialized Codex hook scripts — when set, the Codex TOML block also wires lifecycle hooks. */
+  codexHooksDir?: string
 }
 
 /** Env vars for robrain-sensing — shared by JSON MCP configs and Codex TOML. */
@@ -290,6 +292,35 @@ export function renderCodexBlock(opts: McpWriteOptions): string {
     lines.push(`PLANNING_API_KEY = ${tomlString(opts.planningKey)}`)
     lines.push(`PERCEPTION_API_URL = ${tomlString(opts.perceptionUrl)}`)
     lines.push(`PERCEPTION_API_KEY = ${tomlString(opts.perceptionKey)}`)
+  }
+
+  // Lifecycle hooks — Codex's hook contract is Claude-compatible (same stdin,
+  // same hookSpecificOutput.additionalContext), so these run the same scripts
+  // as the Claude Code plugin, materialized under ~/.robrain/hooks/codex.
+  // Codex prompts the user to trust the hooks on first run.
+  if (opts.codexHooksDir) {
+    const script = (name: string) => tomlString(`node "${join(opts.codexHooksDir!, name)}"`)
+    lines.push('')
+    lines.push('[[hooks.SessionStart]]')
+    lines.push('[[hooks.SessionStart.hooks]]')
+    lines.push('type = "command"')
+    lines.push(`command = ${script('session-start.mjs')}`)
+    lines.push('timeout = 10')
+    lines.push(`statusMessage = ${tomlString('Loading RoBrain project memory')}`)
+    lines.push('')
+    lines.push('[[hooks.UserPromptSubmit]]')
+    lines.push('[[hooks.UserPromptSubmit.hooks]]')
+    lines.push('type = "command"')
+    lines.push(`command = ${script('user-prompt-submit.mjs')}`)
+    lines.push('timeout = 10')
+    lines.push(`statusMessage = ${tomlString('Checking RoBrain for rejected approaches')}`)
+    lines.push('')
+    lines.push('[[hooks.Stop]]')
+    lines.push('[[hooks.Stop.hooks]]')
+    lines.push('type = "command"')
+    lines.push(`command = ${script('stop.mjs')}`)
+    lines.push('timeout = 30')
+    lines.push('async = true')
   }
 
   lines.push(CODEX_BLOCK_END)

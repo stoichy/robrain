@@ -36,7 +36,16 @@ export interface AgentOptions {
 export async function askAgent(context: string, task: string, opts: AgentOptions = {}): Promise<AgentReply> {
   const provider = resolveLlmProvider()
   const user = context ? `${context}\n\n---\n\nTask: ${task}` : `Task: ${task}`
-  const maxTokens = opts.maxTokens ?? 1024
+  // Reasoning models (e.g. Meta Muse Spark via AI Gateway) reject
+  // response_format: json_object and spend a large hidden-reasoning budget
+  // (~900+ tokens) before emitting the JSON. VETOBENCH_JSON_MODE=0 drops
+  // response_format — the system prompt already mandates a bare JSON object and
+  // parseAgentReply is fence-tolerant — and VETOBENCH_MAX_TOKENS raises the
+  // ceiling so the JSON is not truncated after reasoning (a truncated reply
+  // parses to an empty proposal and would be miscounted as "avoided"). Both
+  // default off, so gpt-4o / Haiku runs are unchanged.
+  const maxTokens = opts.maxTokens ?? (Number.parseInt(process.env.VETOBENCH_MAX_TOKENS ?? '', 10) || 1024)
+  const jsonMode = process.env.VETOBENCH_JSON_MODE !== '0'
 
   const raw = provider === 'openai'
     ? await openaiChat({
@@ -45,7 +54,7 @@ export async function askAgent(context: string, task: string, opts: AgentOptions
         system: SYSTEM_PROMPT,
         user,
         maxTokens,
-        json: true,
+        json: jsonMode,
       })
     : await anthropicChat({
         apiKey: process.env.ANTHROPIC_API_KEY ?? '',

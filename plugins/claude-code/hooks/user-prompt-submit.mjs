@@ -13,6 +13,7 @@
 import {
   readStdin, parseHookInput, loadPerception, resolveProjectId,
   perceptionFetch, emitContext, exitSilently, loadWarnedIds, recordWarnedIds,
+  stashPrompt,
 } from './lib.mjs'
 
 const input = parseHookInput(await readStdin())
@@ -24,6 +25,10 @@ if (!prompt || prompt.startsWith('/')) exitSilently()
 
 const cwd = input.cwd ?? process.cwd()
 const sessionId = typeof input.session_id === 'string' ? input.session_id : ''
+
+// Stash the prompt for stop-hook capture on clients whose transcript format
+// we do not parse (Codex pairs this with last_assistant_message).
+stashPrompt(sessionId, prompt)
 const perception = loadPerception()
 const projectId = resolveProjectId(cwd)
 

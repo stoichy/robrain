@@ -110,11 +110,11 @@ pnpm docker:up
 
 ### Fully-local LLM: Sensing fails with `host.docker.internal` / doctor wants API keys
 
-With Ollama (or LM Studio / vLLM) and Perception in Docker, a single `OPENAI_BASE_URL=http://host.docker.internal:…` breaks host processes: Sensing MCP and Synthesis need `127.0.0.1`. Set both URLs (full steps: [CLI — Fully-local LLM](cli.md#fully-local-llm-ollama--lm-studio--vllm)):
+With a local OpenAI-compatible server (Ollama / LM Studio / vLLM) and Perception in Docker, a single `OPENAI_BASE_URL=http://host.docker.internal:…` breaks host processes: Sensing MCP and Synthesis need `127.0.0.1`. Set both URLs using **your** server’s port (not tied to a model — common defaults: Ollama `11434`, LM Studio `1234`, vLLM `8000`). Full steps: [CLI — Fully-local LLM](cli.md#fully-local-llm-ollama--lm-studio--vllm).
 
 ```bash
-OPENAI_BASE_URL=http://host.docker.internal:11434/v1
-OPENAI_HOST_BASE_URL=http://127.0.0.1:11434/v1
+OPENAI_BASE_URL=http://host.docker.internal:<port>/v1
+OPENAI_HOST_BASE_URL=http://127.0.0.1:<port>/v1
 LLM_PROVIDER=openai
 EMBEDDING_PROVIDER=openai
 ```
@@ -134,11 +134,11 @@ python3 -c "import json; e=json.load(open('$HOME/.cursor/mcp.json'))['mcpServers
 
 `robrain doctor` warnings about missing `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` are expected when you run it from a project directory that has **no** `.env` with those URLs — doctor reads the shell / cwd `.env`, not `mcp.json`. Run doctor from the clone (or `~/.robrain/stack/`) where the local URLs are set; it should report that a key is not needed for the local server.
 
-Also verify Perception can reach Ollama:
+Also verify Perception can reach the local server:
 
 ```bash
 docker exec robrain-perception printenv OPENAI_BASE_URL
-docker exec robrain-perception curl -sf http://host.docker.internal:11434/api/tags
+docker exec robrain-perception curl -sf http://host.docker.internal:<port>/api/tags
 ```
 
 ### Perception container unhealthy or refusing to start

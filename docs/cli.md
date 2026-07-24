@@ -91,10 +91,10 @@ Run extraction, chat, and embeddings against a local OpenAI-compatible server �
 
 | Process | Needs |
 |---------|--------|
-| Perception (Docker) | `host.docker.internal` to reach Ollama on your machine |
+| Perception (Docker) | `host.docker.internal` to reach the LLM server on your machine |
 | Sensing / Synthesis / `robrain doctor` (host) | `127.0.0.1` — Node `fetch` often fails on `host.docker.internal` |
 
-Set both:
+Use **your** server’s host port and **whatever models it serves**. The placeholders below are required in shape only — replace `<port>`, `<chat-model>`, and `<embedding-model>`. Keep the `/v1` suffix. Common defaults: Ollama `11434`, LM Studio `1234`, vLLM `8000`.
 
 ```bash
 LLM_PROVIDER=openai
@@ -102,23 +102,31 @@ EMBEDDING_PROVIDER=openai
 # OPENAI_API_KEY=          # optional — local servers usually ignore auth
 
 # Perception in Docker → host machine
-OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+OPENAI_BASE_URL=http://host.docker.internal:<port>/v1
 # Sensing / Synthesis / doctor on the host
-OPENAI_HOST_BASE_URL=http://127.0.0.1:11434/v1
+OPENAI_HOST_BASE_URL=http://127.0.0.1:<port>/v1
 
-# Models your local server actually serves (must match for chat + embeddings)
+# Models your local server actually exposes (names from `ollama list`, LM Studio, etc.)
+OPENAI_LLM_MODEL=<chat-model>
+OPENAI_EMBEDDING_MODEL=<embedding-model>
+```
+
+Ollama-shaped **example** (not required — swap port/models for yours):
+
+```bash
+OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+OPENAI_HOST_BASE_URL=http://127.0.0.1:11434/v1
 OPENAI_LLM_MODEL=llama3.2:3b
 OPENAI_EMBEDDING_MODEL=nomic-embed-text
 ```
 
-Ports for other servers: LM Studio typically `1234`, vLLM often `8000`. Keep the `/v1` suffix. Host-only (no Docker Perception) can set a single `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` and leave `OPENAI_HOST_BASE_URL` unset.
+Host-only (no Docker Perception) can set a single `OPENAI_BASE_URL=http://127.0.0.1:<port>/v1` and leave `OPENAI_HOST_BASE_URL` unset.
 
 **Clone path**
 
 ```bash
-# 1. Start Ollama (or LM Studio / vLLM) and pull models
-ollama pull llama3.2:3b
-ollama pull nomic-embed-text
+# 1. Start your local server and pull/load the chat + embedding models you chose
+#    e.g. ollama pull <chat-model> && ollama pull <embedding-model>
 
 # 2. Put the variables above in repo-root .env (see .env.example)
 pnpm docker:up:build          # rebuild Perception so it picks up the env
@@ -143,10 +151,9 @@ cd /path/to/your/project && npx robrain init-project
 **Verify**
 
 ```bash
-# Perception sees the Docker URL and can reach Ollama
+# Perception should show your Docker-side URL and reach the local server
 docker exec robrain-perception printenv OPENAI_BASE_URL
-# → http://host.docker.internal:11434/v1
-docker exec robrain-perception curl -sf http://host.docker.internal:11434/api/tags
+docker exec robrain-perception curl -sf http://host.docker.internal:<port>/api/tags   # Ollama; other servers differ
 curl -sf http://127.0.0.1:3001/health
 
 # Doctor (from the clone / stack .env) should treat the local server as keyless
